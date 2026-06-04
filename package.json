@@ -11,10 +11,13 @@
     "expo-av": "^16.0.8",
     "expo-barcode-scanner": "^13.0.1",
     "expo-camera": "^56.0.7",
+    "expo-constants": "~56.0.16",
     "expo-crypto": "^56.0.4",
     "expo-dev-client": "~56.0.18",
     "expo-file-system": "^56.0.7",
+    "expo-font": "~56.0.5",
     "expo-image-picker": "^56.0.15",
+    "expo-linking": "~56.0.13",
     "expo-media-library": "^56.0.6",
     "expo-router": "^56.2.8",
     "expo-secure-store": "^56.0.4",
@@ -24,10 +27,11 @@
     "nativewind": "^4.2.4",
     "react": "19.2.3",
     "react-native": "0.85.3",
-    "react-native-gesture-handler": "^3.0.0",
-    "react-native-reanimated": "^4.4.1",
-    "react-native-safe-area-context": "^5.8.0",
+    "react-native-gesture-handler": "~2.31.1",
+    "react-native-reanimated": "4.3.1",
+    "react-native-safe-area-context": "5.7.0",
     "react-native-screens": "^4.25.2",
+    "react-native-worklets": "0.8.3",
     "tailwindcss": "^3.4.17",
     "zustand": "^5.0.14"
   },
@@ -49,5 +53,21 @@
     "test": "jest --config jest.config.smoke.js --watchAll=false",
     "test:watch": "jest --config jest.config.smoke.js"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "expo-image-loader": "56.0.3"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "expo-av",
+          "@jamsch/expo-speech-recognition",
+          "expo-barcode-scanner",
+          "expo-modules-jsi"
+        ],
+        "listUnknownPackages": false
+      }
+    }
+  }
 }
