@@ -16,7 +16,8 @@
         "NSMicrophoneUsageDescription": "Meet AI needs microphone access to record meetings.",
         "NSCameraUsageDescription": "Meet AI uses the camera to document issues and tasks.",
         "NSPhotoLibraryUsageDescription": "Meet AI saves photos from your meetings.",
-        "NSLocationWhenInUseUsageDescription": "Meet AI can use location to help tag meeting context."
+        "NSLocationWhenInUseUsageDescription": "Meet AI can use location to help tag meeting context.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "plugins": [
