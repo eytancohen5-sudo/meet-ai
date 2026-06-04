@@ -5,12 +5,17 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getDb } from '../lib/database';
 import { useSettings } from '../stores/settings';
+import { useAuth } from '../stores/auth';
 
 export default function RootLayout() {
   const loadSettings = useSettings(s => s.load);
+  const hydrate = useAuth(s => s.hydrate);
 
   useEffect(() => {
-    getDb().then(() => loadSettings());
+    getDb().then(() => {
+      loadSettings();
+      hydrate();
+    });
   }, []);
 
   return (

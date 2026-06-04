@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Alert, SafeAreaView, Modal, FlatList, Image, ActivityIndicator,
+  Alert, SafeAreaView, Modal, FlatList, Image, ActivityIndicator, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,13 +9,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from '@jamsch/expo-speech-recognition';
 import { useActiveSession } from '../../stores/session';
 import {
-  addTranscriptLine, addMediaItem, updateSession, getLocations, getStaff,
+  addTranscriptLine, addMediaItem, updateSession, getContexts, getStaff,
 } from '../../lib/database';
-import { identifyRoomFromPhoto } from '../../lib/vision';
+import { identifyContextFromPhoto } from '../../lib/vision';
 import { useSettings } from '../../stores/settings';
 import { stopRecording, pauseRecording, resumeRecording, saveAudioToDocuments, formatDuration, getRecordingElapsed } from '../../lib/transcription';
 import { TranscriptLineView } from '../../components/TranscriptLine';
-import { TranscriptLine, Location, StaffMember } from '../../types';
+import { TranscriptLine, Context, StaffMember } from '../../types';
 import { nanoid } from '../_utils';
 
 export default function ActiveSessionScreen() {
@@ -24,9 +24,9 @@ export default function ActiveSessionScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [contexts, setContexts] = useState<Context[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [showContextPicker, setShowContextPicker] = useState(false);
   const [showSpeakerPicker, setShowSpeakerPicker] = useState(false);
   const [activeSpeakerId, setActiveSpeakerId] = useState<string>('me');
   const [pendingText, setPendingText] = useState('');
@@ -53,8 +53,8 @@ export default function ActiveSessionScreen() {
         start_time: startTime,
         end_time: startTime + 2,
         timestamp: now,
-        location_id: session.currentLocationId ?? undefined,
-        location_name: session.currentLocationName ?? undefined,
+        context_id: session.currentContextId ?? undefined,
+        context_name: session.currentContextName ?? undefined,
       };
       session.addTranscriptLine(line);
       addTranscriptLine({
@@ -65,7 +65,7 @@ export default function ActiveSessionScreen() {
         start_time: line.start_time,
         end_time: line.end_time,
         timestamp: line.timestamp,
-        location_id: line.location_id,
+        context_id: line.context_id,
       });
       setPendingText('');
       recognitionStartTime.current = Date.now();
@@ -102,8 +102,8 @@ export default function ActiveSessionScreen() {
   }
 
   useEffect(() => {
-    Promise.all([getLocations(), getStaff()]).then(([locs, stf]) => {
-      setLocations(locs);
+    Promise.all([getContexts(), getStaff()]).then(([ctxs, stf]) => {
+      setContexts(ctxs);
       setStaff(stf);
     });
   }, []);
@@ -172,10 +172,10 @@ export default function ActiveSessionScreen() {
     );
   };
 
-  const handleChangeLocation = async (loc: Location) => {
-    setShowLocationPicker(false);
-    session.updateLocation(loc.id, loc.name);
-    await updateSession(id, { location_id: loc.id });
+  const handleChangeContext = async (ctx: Context) => {
+    setShowContextPicker(false);
+    session.updateContext(ctx.id, ctx.name);
+    await updateSession(id, { context_id: ctx.id });
   };
 
   const handleCameraPress = () => {
@@ -188,8 +188,8 @@ export default function ActiveSessionScreen() {
           onPress: () => captureAndAttach(),
         },
         {
-          text: '📍  Identify my location',
-          onPress: () => captureAndIdentifyRoom(),
+          text: '📍  Identify where I am',
+          onPress: () => captureAndIdentifyContext(),
         },
         { text: 'Cancel', style: 'cancel' },
       ]
@@ -214,7 +214,7 @@ export default function ActiveSessionScreen() {
     }
   };
 
-  const captureAndIdentifyRoom = async () => {
+  const captureAndIdentifyContext = async () => {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       quality: 0.7,
@@ -223,37 +223,37 @@ export default function ActiveSessionScreen() {
 
     setIdentifyingLocation(true);
     try {
-      const match = await identifyRoomFromPhoto(
+      const match = await identifyContextFromPhoto(
         result.assets[0].uri,
-        locations,
+        contexts,
         anthropicApiKey || undefined
       );
 
       if (match.matched_id && match.confidence >= 0.6) {
         // High-confidence match — auto-tag without asking
-        session.updateLocation(match.matched_id, match.matched_name ?? match.suggested_name);
-        await updateSession(id, { location_id: match.matched_id });
+        session.updateContext(match.matched_id, match.matched_name ?? match.suggested_name);
+        await updateSession(id, { context_id: match.matched_id });
         Alert.alert(
           `📍 ${match.matched_name}`,
-          `Location updated${match.confidence >= 0.85 ? '' : ' (matched with moderate confidence)'}.`,
+          `Context updated${match.confidence >= 0.85 ? '' : ' (matched with moderate confidence)'}.`,
           [{ text: 'OK' }]
         );
       } else if (match.matched_id && match.confidence >= 0.4) {
         // Lower confidence — ask user to confirm
         Alert.alert(
-          'Location Match',
+          'Context Match',
           `This looks like "${match.matched_name}" — is that right?`,
           [
             {
               text: `Yes, I'm in ${match.matched_name}`,
               onPress: async () => {
-                session.updateLocation(match.matched_id!, match.matched_name!);
-                await updateSession(id, { location_id: match.matched_id! });
+                session.updateContext(match.matched_id!, match.matched_name!);
+                await updateSession(id, { context_id: match.matched_id! });
               },
             },
             {
               text: 'No, pick manually',
-              onPress: () => setShowLocationPicker(true),
+              onPress: () => setShowContextPicker(true),
             },
             { text: 'Cancel', style: 'cancel' },
           ]
@@ -261,18 +261,18 @@ export default function ActiveSessionScreen() {
       } else {
         // No match — show manual picker with the suggested name
         Alert.alert(
-          'Room Not Recognised',
-          `This looks like "${match.suggested_name}" but it's not in your saved rooms. Pick a room manually or add this one in Spaces.`,
+          'Context Not Recognised',
+          `This looks like "${match.suggested_name}" but it's not in your saved contexts. Pick a context manually or add this one in Spaces.`,
           [
-            { text: 'Pick Manually', onPress: () => setShowLocationPicker(true) },
+            { text: 'Pick Manually', onPress: () => setShowContextPicker(true) },
             { text: 'Cancel', style: 'cancel' },
           ]
         );
       }
     } catch (err) {
-      console.error('Room identification failed:', err);
-      Alert.alert('Could Not Identify', 'AI identification failed. Pick the room manually.', [
-        { text: 'Pick Room', onPress: () => setShowLocationPicker(true) },
+      console.error('Context identification failed:', err);
+      Alert.alert('Could Not Identify', 'AI identification failed. Pick the context manually.', [
+        { text: 'Pick Manually', onPress: () => setShowContextPicker(true) },
         { text: 'Cancel', style: 'cancel' },
       ]);
     } finally {
@@ -287,6 +287,18 @@ export default function ActiveSessionScreen() {
         color: staff.find(s => s.id === activeSpeakerId)!.color,
         initials: staff.find(s => s.id === activeSpeakerId)!.avatar_initials,
       } : { name: 'Unknown', color: '#6b7280', initials: '?' };
+
+  if (Platform.OS === 'web') {
+    return (
+      <SafeAreaView className="flex-1 bg-white items-center justify-center p-8">
+        <Ionicons name="phone-portrait-outline" size={48} color="#D9E2EC" />
+        <Text className="text-navy-800 font-semibold text-lg mt-4">Mobile app required</Text>
+        <Text className="text-gray-400 text-sm mt-2 text-center">
+          Recording is only available in the Meet AI mobile app.
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-gray-950">
@@ -304,14 +316,14 @@ export default function ActiveSessionScreen() {
           </Text>
         </View>
 
-        {/* Location */}
+        {/* Context chip */}
         <TouchableOpacity
           className="flex-row items-center gap-2 bg-white/10 rounded-xl px-3 py-2 self-start"
-          onPress={() => setShowLocationPicker(true)}
+          onPress={() => setShowContextPicker(true)}
         >
           <Ionicons name="location" size={14} color="#C9A84C" />
           <Text className="text-white text-sm font-medium">
-            {session.currentLocationName ?? 'Tap to set location'}
+            {session.currentContextName ?? 'Tap to set context'}
           </Text>
           <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.5)" />
         </TouchableOpacity>
@@ -403,7 +415,7 @@ export default function ActiveSessionScreen() {
 
             <TouchableOpacity
               className="w-12 h-12 bg-gray-100 rounded-full items-center justify-center"
-              onPress={() => setShowLocationPicker(true)}
+              onPress={() => setShowContextPicker(true)}
             >
               <Ionicons name="location-outline" size={22} color="#4b5563" />
             </TouchableOpacity>
@@ -411,23 +423,23 @@ export default function ActiveSessionScreen() {
         </View>
       </View>
 
-      {/* Location Picker Modal */}
-      <Modal visible={showLocationPicker} animationType="slide" presentationStyle="pageSheet">
+      {/* Context Picker Modal */}
+      <Modal visible={showContextPicker} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView className="flex-1 bg-white">
           <View className="flex-row items-center px-5 pt-4 pb-4 border-b border-gray-100">
-            <Text className="text-navy-800 text-lg font-bold flex-1">Change Location</Text>
-            <TouchableOpacity onPress={() => setShowLocationPicker(false)}>
+            <Text className="text-navy-800 text-lg font-bold flex-1">Change Context</Text>
+            <TouchableOpacity onPress={() => setShowContextPicker(false)}>
               <Ionicons name="close" size={24} color="#1E3A5F" />
             </TouchableOpacity>
           </View>
           <FlatList
-            data={locations}
+            data={contexts}
             keyExtractor={item => item.id}
             contentContainerStyle={{ padding: 16 }}
             renderItem={({ item }) => (
               <TouchableOpacity
-                className={`mb-2 rounded-xl border overflow-hidden ${session.currentLocationId === item.id ? 'border-navy-800' : 'border-gray-200'}`}
-                onPress={() => handleChangeLocation(item)}
+                className={`mb-2 rounded-xl border overflow-hidden ${session.currentContextId === item.id ? 'border-navy-800' : 'border-gray-200'}`}
+                onPress={() => handleChangeContext(item)}
               >
                 {item.reference_image_uri ? (
                   <Image
@@ -436,12 +448,12 @@ export default function ActiveSessionScreen() {
                     resizeMode="cover"
                   />
                 ) : null}
-                <View className={`flex-row items-center px-4 py-3 ${session.currentLocationId === item.id ? 'bg-navy-50' : 'bg-white'}`}>
+                <View className={`flex-row items-center px-4 py-3 ${session.currentContextId === item.id ? 'bg-navy-50' : 'bg-white'}`}>
                   <Text className="text-xl mr-3">{item.icon}</Text>
-                  <Text className={`flex-1 font-medium ${session.currentLocationId === item.id ? 'text-navy-800' : 'text-gray-800'}`}>
+                  <Text className={`flex-1 font-medium ${session.currentContextId === item.id ? 'text-navy-800' : 'text-gray-800'}`}>
                     {item.name}
                   </Text>
-                  {session.currentLocationId === item.id && (
+                  {session.currentContextId === item.id && (
                     <Ionicons name="checkmark-circle" size={22} color="#1E3A5F" />
                   )}
                 </View>

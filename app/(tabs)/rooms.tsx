@@ -2,30 +2,53 @@ import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Alert, SafeAreaView, TextInput, Modal,
-  Image, ActivityIndicator,
+  Image, ActivityIndicator, Platform, Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { getLocations, upsertLocation, deleteLocation, getStaff, upsertStaff, deleteStaff } from '../../lib/database';
-import { describeRoomForRegistration } from '../../lib/vision';
-import { Location, StaffMember, SPEAKER_COLORS } from '../../types';
+import { getContexts, upsertContext, deleteContext, getStaff, upsertStaff, deleteStaff } from '../../lib/database';
+import { getOrCreateInviteCode, generateInviteLink } from '../../lib/invites';
+import { describeContextFromPhoto } from '../../lib/vision';
+import { Context, ContextType, StaffMember, SPEAKER_COLORS } from '../../types';
 import { useSettings } from '../../stores/settings';
 import { nanoid } from '../_utils';
 
+const CONTEXT_TYPES: { type: ContextType; label: string; icon: string }[] = [
+  { type: 'space', label: 'Space', icon: '🏠' },
+  { type: 'product', label: 'Product', icon: '📦' },
+  { type: 'presentation', label: 'Presentation', icon: '📊' },
+  { type: 'website', label: 'Website', icon: '🌐' },
+  { type: 'document', label: 'Document', icon: '📄' },
+  { type: 'other', label: 'Other', icon: '📍' },
+];
+
 export default function RoomsScreen() {
-  const [locations, setLocations] = useState<Location[]>([]);
+  if (Platform.OS === 'web') {
+    return (
+      <SafeAreaView className="flex-1 bg-white items-center justify-center p-8">
+        <Ionicons name="phone-portrait-outline" size={48} color="#D9E2EC" />
+        <Text className="text-navy-800 font-semibold text-lg mt-4">Mobile app required</Text>
+        <Text className="text-gray-400 text-sm mt-2 text-center">
+          Recording is only available in the Meet AI mobile app.
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
+  const [contexts, setContexts] = useState<Context[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [tab, setTab] = useState<'rooms' | 'staff'>('rooms');
 
-  // Add room flow state
+  // Add context flow state
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [addStep, setAddStep] = useState<'photo' | 'confirm'>('photo');
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
   const [savedImageUri, setSavedImageUri] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<{ suggested_name: string; description: string; icon: string } | null>(null);
   const [roomNameInput, setRoomNameInput] = useState('');
+  const [selectedContextType, setSelectedContextType] = useState<ContextType>('space');
   const [identifying, setIdentifying] = useState(false);
 
   // Add staff state
@@ -36,14 +59,14 @@ export default function RoomsScreen() {
   const { anthropicApiKey } = useSettings();
 
   const load = useCallback(async () => {
-    const [locs, stf] = await Promise.all([getLocations(), getStaff()]);
-    setLocations(locs);
+    const [ctxs, stf] = await Promise.all([getContexts(), getStaff()]);
+    setContexts(ctxs);
     setStaff(stf);
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // ── Add room flow ────────────────────────────────────────────────────────────
+  // ── Add context flow ─────────────────────────────────────────────────────────
 
   const openAddRoom = () => {
     setAddStep('photo');
@@ -51,6 +74,7 @@ export default function RoomsScreen() {
     setSavedImageUri(null);
     setAiResult(null);
     setRoomNameInput('');
+    setSelectedContextType('space');
     setShowAddRoom(true);
   };
 
@@ -81,14 +105,14 @@ export default function RoomsScreen() {
     setIdentifying(true);
     setAddStep('confirm');
     try {
-      const result = await describeRoomForRegistration(uri, anthropicApiKey || undefined);
+      const result = await describeContextFromPhoto(uri, anthropicApiKey || undefined);
       setAiResult(result);
       setRoomNameInput(result.suggested_name);
     } catch (err) {
       console.error('Vision error:', err);
-      Alert.alert('Could not identify room', 'AI analysis failed. You can still name it manually.');
-      setAiResult({ suggested_name: 'New Room', description: '', icon: '📍' });
-      setRoomNameInput('New Room');
+      Alert.alert('Could not identify context', 'AI analysis failed. You can still name it manually.');
+      setAiResult({ suggested_name: 'New Context', description: '', icon: '📍' });
+      setRoomNameInput('New Context');
     } finally {
       setIdentifying(false);
     }
@@ -101,40 +125,41 @@ export default function RoomsScreen() {
     let persistedUri = capturedImageUri;
     if (capturedImageUri) {
       try {
-        const roomId = nanoid();
+        const contextId = nanoid();
         const destDir = `${FileSystem.documentDirectory}rooms/`;
         await FileSystem.makeDirectoryAsync(destDir, { intermediates: true });
-        const dest = `${destDir}${roomId}.jpg`;
+        const dest = `${destDir}${contextId}.jpg`;
         await FileSystem.copyAsync({ from: capturedImageUri, to: dest });
         persistedUri = dest;
       } catch (err) {
-        console.warn('Could not persist room image:', err);
+        console.warn('Could not persist context image:', err);
       }
     }
 
-    const loc: Location = {
+    const ctx: Context = {
       id: nanoid(),
       name: roomNameInput.trim(),
       icon: aiResult?.icon ?? '📍',
       color: '#6E8FAC',
+      context_type: selectedContextType,
       reference_image_uri: persistedUri ?? undefined,
       ai_description: aiResult?.description ?? undefined,
     };
-    await upsertLocation(loc);
+    await upsertContext(ctx);
     setShowAddRoom(false);
     await load();
   };
 
-  const confirmDeleteRoom = (loc: Location) => {
-    Alert.alert('Delete Room', `Remove "${loc.name}"? This cannot be undone.`, [
+  const confirmDeleteRoom = (ctx: Context) => {
+    Alert.alert('Delete Context', `Remove "${ctx.name}"? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
           // Delete persisted image if it exists
-          if (loc.reference_image_uri?.startsWith(FileSystem.documentDirectory ?? '')) {
-            await FileSystem.deleteAsync(loc.reference_image_uri, { idempotent: true });
+          if (ctx.reference_image_uri?.startsWith(FileSystem.documentDirectory ?? '')) {
+            await FileSystem.deleteAsync(ctx.reference_image_uri, { idempotent: true });
           }
-          await deleteLocation(loc.id);
+          await deleteContext(ctx.id);
           await load();
         },
       },
@@ -151,6 +176,7 @@ export default function RoomsScreen() {
       role: newStaffRole.trim(),
       color: SPEAKER_COLORS[staff.length % SPEAKER_COLORS.length],
       avatar_initials: newStaffName.trim().split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
+      role_level: 'member',
     };
     await upsertStaff(member);
     setNewStaffName('');
@@ -166,13 +192,28 @@ export default function RoomsScreen() {
     ]);
   };
 
+  const handleInvite = async (member: StaffMember) => {
+    if (!member.email) {
+      Alert.alert('No email', 'Add this person\'s email first before sending an invite.');
+      return;
+    }
+    try {
+      const code = await getOrCreateInviteCode(member.id);
+      if (!code) return;
+      const link = generateInviteLink(code);
+      await Share.share({ message: link, title: 'Join Meet AI' });
+    } catch (err) {
+      console.warn('[rooms] invite share failed:', err);
+    }
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView className="flex-1 bg-navy-800">
       <View className="px-5 pt-4 pb-5">
         <Text className="text-white text-2xl font-bold tracking-tight">Your Villa</Text>
-        <Text className="text-navy-400 text-sm mt-1">Rooms, spaces & staff</Text>
+        <Text className="text-navy-400 text-sm mt-1">Contexts & staff</Text>
       </View>
 
       <View className="flex-1 bg-villa-bg rounded-t-3xl">
@@ -185,7 +226,7 @@ export default function RoomsScreen() {
               onPress={() => setTab(t)}
             >
               <Text className={`text-sm font-medium ${tab === t ? 'text-navy-800' : 'text-gray-500'}`}>
-                {t === 'rooms' ? `Rooms (${locations.length})` : `Staff (${staff.length})`}
+                {t === 'rooms' ? `Contexts (${contexts.length})` : `Staff (${staff.length})`}
               </Text>
             </TouchableOpacity>
           ))}
@@ -197,34 +238,34 @@ export default function RoomsScreen() {
         >
           {tab === 'rooms' ? (
             <>
-              {locations.map(loc => (
-                <View key={loc.id} className="bg-white rounded-2xl border border-villa-border mb-3 overflow-hidden">
-                  {/* Room photo or placeholder */}
-                  {loc.reference_image_uri ? (
+              {contexts.map(ctx => (
+                <View key={ctx.id} className="bg-white rounded-2xl border border-villa-border mb-3 overflow-hidden">
+                  {/* Context photo or placeholder */}
+                  {ctx.reference_image_uri ? (
                     <Image
-                      source={{ uri: loc.reference_image_uri }}
+                      source={{ uri: ctx.reference_image_uri }}
                       className="w-full h-36"
                       resizeMode="cover"
                     />
                   ) : (
                     <View className="w-full h-28 bg-gray-100 items-center justify-center">
-                      <Text className="text-5xl">{loc.icon}</Text>
+                      <Text className="text-5xl">{ctx.icon}</Text>
                       <Text className="text-gray-400 text-xs mt-2">No photo yet</Text>
                     </View>
                   )}
 
                   <View className="p-3 flex-row items-center">
-                    <Text className="text-xl mr-2">{loc.icon}</Text>
+                    <Text className="text-xl mr-2">{ctx.icon}</Text>
                     <View className="flex-1">
-                      <Text className="text-navy-800 font-semibold">{loc.name}</Text>
-                      {loc.ai_description ? (
+                      <Text className="text-navy-800 font-semibold">{ctx.name}</Text>
+                      {ctx.ai_description ? (
                         <Text className="text-gray-400 text-xs mt-0.5" numberOfLines={2}>
-                          {loc.ai_description}
+                          {ctx.ai_description}
                         </Text>
                       ) : null}
                     </View>
                     <TouchableOpacity
-                      onPress={() => confirmDeleteRoom(loc)}
+                      onPress={() => confirmDeleteRoom(ctx)}
                       className="p-2"
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
@@ -241,7 +282,7 @@ export default function RoomsScreen() {
                 <View className="w-12 h-12 bg-navy-50 rounded-full items-center justify-center mb-2">
                   <Ionicons name="camera-outline" size={24} color="#1E3A5F" />
                 </View>
-                <Text className="text-navy-800 font-semibold text-sm">Add Room with Photo</Text>
+                <Text className="text-navy-800 font-semibold text-sm">Add Context with Photo</Text>
                 <Text className="text-gray-400 text-xs mt-1 text-center">
                   Take a photo — AI will identify the space automatically
                 </Text>
@@ -258,6 +299,15 @@ export default function RoomsScreen() {
                     <Text className="text-navy-800 font-medium">{member.name}</Text>
                     {member.role ? <Text className="text-gray-400 text-xs mt-0.5">{member.role}</Text> : null}
                   </View>
+                  {member.email ? (
+                    <TouchableOpacity
+                      onPress={() => handleInvite(member)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      className="mr-3"
+                    >
+                      <Ionicons name="mail-outline" size={18} color="#1e3a5f" />
+                    </TouchableOpacity>
+                  ) : null}
                   <TouchableOpacity onPress={() => confirmDeleteStaff(member)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="trash-outline" size={18} color="#ef4444" />
                   </TouchableOpacity>
@@ -275,7 +325,7 @@ export default function RoomsScreen() {
         </ScrollView>
       </View>
 
-      {/* ── Add Room Modal ── */}
+      {/* ── Add Context Modal ── */}
       <Modal visible={showAddRoom} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView className="flex-1 bg-white">
           <View className="flex-row items-center px-5 pt-4 pb-4 border-b border-gray-100">
@@ -283,7 +333,7 @@ export default function RoomsScreen() {
               <Ionicons name="close" size={24} color="#1E3A5F" />
             </TouchableOpacity>
             <Text className="text-navy-800 text-lg font-bold flex-1">
-              {addStep === 'photo' ? 'Add a Room' : 'Confirm Room'}
+              {addStep === 'photo' ? 'Add Context' : 'Confirm Context'}
             </Text>
           </View>
 
@@ -295,7 +345,7 @@ export default function RoomsScreen() {
                   <Ionicons name="camera" size={32} color="#1E3A5F" />
                 </View>
                 <Text className="text-navy-800 font-semibold text-base text-center">
-                  Point your camera at the room
+                  Point your camera at the context
                 </Text>
                 <Text className="text-navy-400 text-sm mt-2 text-center leading-relaxed">
                   Claude will automatically identify the space and name it for you
@@ -320,7 +370,7 @@ export default function RoomsScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            /* Step 2: Confirm name & save */
+            /* Step 2: Confirm name, type & save */
             <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
               {/* Photo preview */}
               {capturedImageUri && (
@@ -333,7 +383,7 @@ export default function RoomsScreen() {
                   {identifying && (
                     <View className="absolute inset-0 bg-black/40 items-center justify-center">
                       <ActivityIndicator color="white" size="large" />
-                      <Text className="text-white font-medium mt-3">Analysing room...</Text>
+                      <Text className="text-white font-medium mt-3">Analysing context...</Text>
                     </View>
                   )}
                 </View>
@@ -344,7 +394,7 @@ export default function RoomsScreen() {
                 <View className="bg-green-50 border border-green-100 rounded-xl p-3 mb-4 flex-row gap-2">
                   <Ionicons name="sparkles-outline" size={18} color="#15803d" />
                   <View className="flex-1">
-                    <Text className="text-green-800 font-medium text-sm">AI identified this room</Text>
+                    <Text className="text-green-800 font-medium text-sm">AI identified this context</Text>
                     <Text className="text-green-600 text-xs mt-1 leading-relaxed">
                       {aiResult.description}
                     </Text>
@@ -352,13 +402,30 @@ export default function RoomsScreen() {
                 </View>
               )}
 
-              {/* Room name */}
-              <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Room Name</Text>
+              {/* Context type selector */}
+              <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Context Type</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-5">
+                {CONTEXT_TYPES.map(({ type, label, icon }) => (
+                  <TouchableOpacity
+                    key={type}
+                    className={`mr-2 px-3 py-2 rounded-xl border flex-row items-center gap-1.5 ${selectedContextType === type ? 'bg-navy-800 border-navy-800' : 'bg-white border-gray-200'}`}
+                    onPress={() => setSelectedContextType(type)}
+                  >
+                    <Text className="text-sm">{icon}</Text>
+                    <Text className={`text-sm font-medium ${selectedContextType === type ? 'text-white' : 'text-gray-600'}`}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Context name */}
+              <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Context Name</Text>
               <TextInput
                 className="border border-gray-200 rounded-xl px-4 py-3.5 text-gray-800 text-base mb-6"
                 value={roomNameInput}
                 onChangeText={setRoomNameInput}
-                placeholder="e.g. Master Bedroom"
+                placeholder="e.g. Conference Room A"
                 editable={!identifying}
                 autoFocus={!identifying}
               />
@@ -384,7 +451,7 @@ export default function RoomsScreen() {
                   onPress={saveRoom}
                   disabled={identifying || !roomNameInput.trim()}
                 >
-                  <Text className="text-white font-semibold">Save Room</Text>
+                  <Text className="text-white font-semibold">Save Context</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

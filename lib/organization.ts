@@ -1,12 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { TranscriptLine, OrganizedSession, StaffMember, Location } from '../types';
+import { TranscriptLine, OrganizedSession, StaffMember, Context } from '../types';
 
 const client = new Anthropic();
 
 export async function organizeSession(
   transcript: TranscriptLine[],
   staff: StaffMember[],
-  locations: Location[],
+  locations: Context[],
   sessionTitle: string,
   apiKey?: string
 ): Promise<OrganizedSession> {
@@ -18,7 +18,7 @@ export async function organizeSession(
   const transcriptText = transcript
     .map(line => {
       const speaker = line.speaker_id === 'me' ? 'Owner' : (staffMap[line.speaker_id] ?? line.speaker_id);
-      const location = line.location_id ? ` [${locationMap[line.location_id] ?? line.location_id}]` : '';
+      const location = line.context_id ? ` [${locationMap[line.context_id] ?? line.context_id}]` : '';
       const time = new Date(line.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       return `[${time}]${location} ${speaker}: ${line.text}`;
     })

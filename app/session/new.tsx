@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  SafeAreaView, TextInput, Alert,
+  SafeAreaView, TextInput, Alert, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { getLocations, getStaff, createSession, addParticipant } from '../../lib/database';
-import { Location, StaffMember } from '../../types';
+import { getContexts, getStaff, createSession, addParticipant } from '../../lib/database';
+import { Context, StaffMember } from '../../types';
 import { useActiveSession } from '../../stores/session';
 import { startRecording, requestAudioPermissions } from '../../lib/transcription';
 import { nanoid } from '../_utils';
 
 export default function NewSessionScreen() {
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [contexts, setContexts] = useState<Context[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [selectedContext, setSelectedContext] = useState<Context | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Set<string>>(new Set());
   const [title, setTitle] = useState('');
   const [starting, setStarting] = useState(false);
@@ -22,8 +22,8 @@ export default function NewSessionScreen() {
   const startSession = useActiveSession(s => s.startSession);
 
   useEffect(() => {
-    Promise.all([getLocations(), getStaff()]).then(([locs, stf]) => {
-      setLocations(locs);
+    Promise.all([getContexts(), getStaff()]).then(([ctxs, stf]) => {
+      setContexts(ctxs);
       setStaff(stf);
     });
     const now = new Date();
@@ -55,7 +55,7 @@ export default function NewSessionScreen() {
       await createSession({
         id: sessionId,
         title: title.trim() || 'Walkthrough',
-        location_id: selectedLocation?.id,
+        context_id: selectedContext?.id,
         started_at: Date.now(),
         status: 'recording',
       });
@@ -68,8 +68,8 @@ export default function NewSessionScreen() {
 
       startSession(
         sessionId,
-        selectedLocation?.id ?? null,
-        selectedLocation?.name ?? null,
+        selectedContext?.id ?? null,
+        selectedContext?.name ?? null,
         participantIds
       );
 
@@ -80,6 +80,18 @@ export default function NewSessionScreen() {
       setStarting(false);
     }
   };
+
+  if (Platform.OS === 'web') {
+    return (
+      <SafeAreaView className="flex-1 bg-white items-center justify-center p-8">
+        <Ionicons name="phone-portrait-outline" size={48} color="#D9E2EC" />
+        <Text className="text-navy-800 font-semibold text-lg mt-4">Mobile app required</Text>
+        <Text className="text-gray-400 text-sm mt-2 text-center">
+          Recording is only available in the Meet AI mobile app.
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -105,27 +117,27 @@ export default function NewSessionScreen() {
           returnKeyType="done"
         />
 
-        {/* Location */}
-        <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-3">Starting Location</Text>
+        {/* Context */}
+        <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-3">Starting Context</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
           <TouchableOpacity
-            className={`mr-2 px-4 py-3 rounded-xl border flex-row items-center gap-2 ${!selectedLocation ? 'bg-navy-800 border-navy-800' : 'bg-white border-gray-200'}`}
-            onPress={() => setSelectedLocation(null)}
+            className={`mr-2 px-4 py-3 rounded-xl border flex-row items-center gap-2 ${!selectedContext ? 'bg-navy-800 border-navy-800' : 'bg-white border-gray-200'}`}
+            onPress={() => setSelectedContext(null)}
           >
-            <Ionicons name="help-outline" size={16} color={!selectedLocation ? 'white' : '#6b7280'} />
-            <Text className={`text-sm font-medium ${!selectedLocation ? 'text-white' : 'text-gray-500'}`}>
+            <Ionicons name="help-outline" size={16} color={!selectedContext ? 'white' : '#6b7280'} />
+            <Text className={`text-sm font-medium ${!selectedContext ? 'text-white' : 'text-gray-500'}`}>
               Ask me
             </Text>
           </TouchableOpacity>
-          {locations.map(loc => (
+          {contexts.map(ctx => (
             <TouchableOpacity
-              key={loc.id}
-              className={`mr-2 px-4 py-3 rounded-xl border flex-row items-center gap-2 ${selectedLocation?.id === loc.id ? 'border-navy-800 bg-navy-50' : 'bg-white border-gray-200'}`}
-              onPress={() => setSelectedLocation(loc)}
+              key={ctx.id}
+              className={`mr-2 px-4 py-3 rounded-xl border flex-row items-center gap-2 ${selectedContext?.id === ctx.id ? 'border-navy-800 bg-navy-50' : 'bg-white border-gray-200'}`}
+              onPress={() => setSelectedContext(ctx)}
             >
-              <Text className="text-base">{loc.icon}</Text>
-              <Text className={`text-sm font-medium ${selectedLocation?.id === loc.id ? 'text-navy-800' : 'text-gray-700'}`}>
-                {loc.name}
+              <Text className="text-base">{ctx.icon}</Text>
+              <Text className={`text-sm font-medium ${selectedContext?.id === ctx.id ? 'text-navy-800' : 'text-gray-700'}`}>
+                {ctx.name}
               </Text>
             </TouchableOpacity>
           ))}
@@ -181,7 +193,7 @@ export default function NewSessionScreen() {
         <View className="bg-amber-50 rounded-xl p-3 mb-6 flex-row gap-2">
           <Ionicons name="mic-outline" size={16} color="#92400e" />
           <Text className="flex-1 text-xs text-amber-800 leading-relaxed">
-            Recording will start immediately. You can change the location while walking.
+            Recording will start immediately. You can change the context while walking.
           </Text>
         </View>
       </ScrollView>

@@ -60,8 +60,8 @@ export default function SessionsScreen() {
     <SafeAreaView className="flex-1 bg-navy-800">
       {/* Header */}
       <View className="px-5 pt-4 pb-5">
-        <Text className="text-white text-2xl font-bold tracking-tight">Villa Assistant</Text>
-        <Text className="text-navy-400 text-sm mt-1">Walk-around meeting recorder</Text>
+        <Text className="text-white text-2xl font-bold tracking-tight">Meet AI</Text>
+        <Text className="text-navy-400 text-sm mt-1">AI-powered team meeting recorder</Text>
       </View>
 
       <View className="flex-1 bg-villa-bg rounded-t-3xl">

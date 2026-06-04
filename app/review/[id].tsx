@@ -12,7 +12,8 @@ import {
   updateTaskStatus, updateSession,
 } from '../../lib/database';
 import { organizeSession } from '../../lib/organization';
-import { getLocations, getStaff } from '../../lib/database';
+import { syncSessionToSupabase, syncTaskUpdate } from '../../lib/sync';
+import { getContexts, getStaff } from '../../lib/database';
 import { TaskCard } from '../../components/TaskCard';
 import { TranscriptLineView } from '../../components/TranscriptLine';
 import { Session, TranscriptLine, Task, Idea, Issue, Decision, MediaItem } from '../../types';
@@ -75,7 +76,7 @@ export default function ReviewScreen() {
     if (organizing) return;
     setOrganizing(true);
     try {
-      const [locs, staff] = await Promise.all([getLocations(), getStaff()]);
+      const [locs, staff] = await Promise.all([getContexts(), getStaff()]);
       const result = await organizeSession(lines, staff, locs, sess.title, anthropicApiKey || undefined);
 
       // Save organized data
@@ -105,6 +106,7 @@ export default function ReviewScreen() {
         ),
         updateSession(id, { status: 'complete', summary: result.summary }),
       ]);
+      syncSessionToSupabase(id).catch(console.warn); // non-blocking
 
       await loadAll();
     } catch (err) {
@@ -118,6 +120,7 @@ export default function ReviewScreen() {
 
   const handleTaskToggle = async (taskId: string, status: 'open' | 'done') => {
     await updateTaskStatus(taskId, status);
+    syncTaskUpdate(taskId, status).catch(console.warn); // non-blocking
     const updated = tasks.map(t => t.id === taskId ? { ...t, status } : t);
     setTasks(updated);
   };
@@ -127,7 +130,7 @@ export default function ReviewScreen() {
     const lines = [
       `# ${session.title}`,
       `${new Date(session.started_at).toLocaleString()}`,
-      session.location_name ? `Location: ${session.location_name}` : '',
+      session.context_name ? `Context: ${session.context_name}` : '',
       '',
       session.summary ? `## Summary\n${session.summary}` : '',
       '',
@@ -203,10 +206,10 @@ export default function ReviewScreen() {
           </TouchableOpacity>
         </View>
         <View className="flex-row gap-3 flex-wrap">
-          {session.location_name && (
+          {session.context_name && (
             <View className="flex-row items-center gap-1">
               <Ionicons name="location-outline" size={12} color="#9cb3c9" />
-              <Text className="text-navy-400 text-xs">{session.location_name}</Text>
+              <Text className="text-navy-400 text-xs">{session.context_name}</Text>
             </View>
           )}
           <View className="flex-row items-center gap-1">

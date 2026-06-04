@@ -48,10 +48,10 @@ export function SessionCard({ session, onPress, onLongPress }: Props) {
       </View>
 
       <View className="flex-row items-center gap-3 flex-wrap">
-        {session.location_name && (
+        {session.context_name && (
           <View className="flex-row items-center gap-1">
             <Ionicons name="location-outline" size={13} color="#6E8FAC" />
-            <Text className="text-navy-400 text-xs">{session.location_name}</Text>
+            <Text className="text-navy-400 text-xs">{session.context_name}</Text>
           </View>
         )}
         <View className="flex-row items-center gap-1">

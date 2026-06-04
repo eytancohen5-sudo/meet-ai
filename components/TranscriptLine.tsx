@@ -34,9 +34,9 @@ export function TranscriptLineView({ line, isOwner, onPress }: Props) {
         <Text className="text-xs font-semibold" style={{ color: line.speaker_color }}>
           {isMe ? 'You' : line.speaker_name}
         </Text>
-        {line.location_name && (
+        {line.context_name && (
           <View className="bg-navy-50 px-2 py-0.5 rounded-full">
-            <Text className="text-xs text-navy-400">{line.location_name}</Text>
+            <Text className="text-xs text-navy-400">{line.context_name}</Text>
           </View>
         )}
         <Text className="text-xs text-gray-400 ml-auto">{time}</Text>

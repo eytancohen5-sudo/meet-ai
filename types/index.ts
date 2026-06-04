@@ -1,12 +1,17 @@
 export type SessionStatus = 'recording' | 'processing' | 'complete' | 'paused';
 
-export interface Location {
+export type UserRole = 'owner' | 'manager' | 'member';
+
+export type ContextType = 'space' | 'product' | 'presentation' | 'website' | 'document' | 'other';
+
+export interface Context {
   id: string;
   name: string;
   icon: string;
   color: string;
-  reference_image_uri?: string;  // local photo used to visually identify this room
-  ai_description?: string;       // Claude's description of the room for matching
+  context_type: ContextType;
+  reference_image_uri?: string;  // local photo used to visually identify this context
+  ai_description?: string;       // Claude's description of the context for matching
 }
 
 export interface StaffMember {
@@ -16,13 +21,19 @@ export interface StaffMember {
   color: string;
   voice_sample_uri?: string;
   avatar_initials: string;
+  // New fields for Meet AI platform
+  email?: string;
+  role_level: UserRole;
+  invite_code?: string;
+  supabase_user_id?: string;
+  avatar_url?: string;
 }
 
 export interface Session {
   id: string;
   title: string;
-  location_id?: string;
-  location_name?: string;
+  context_id?: string;
+  context_name?: string;
   started_at: number;
   ended_at?: number;
   status: SessionStatus;
@@ -44,8 +55,8 @@ export interface TranscriptLine {
   start_time: number;
   end_time: number;
   timestamp: number;
-  location_id?: string;
-  location_name?: string;
+  context_id?: string;
+  context_name?: string;
 }
 
 export interface Task {
@@ -122,17 +133,4 @@ export const SPEAKER_COLORS = [
   '#1A6B8A',
   '#8B3252',
   '#4A6741',
-];
-
-export const DEFAULT_LOCATIONS: Location[] = [
-  { id: 'entrance', name: 'Entrance', icon: '🚪', color: '#6E8FAC' },
-  { id: 'living-room', name: 'Living Room', icon: '🛋️', color: '#2D7A3E' },
-  { id: 'kitchen', name: 'Kitchen', icon: '🍳', color: '#C9501A' },
-  { id: 'master-bedroom', name: 'Master Bedroom', icon: '🛏️', color: '#7B4F9E' },
-  { id: 'pool', name: 'Pool Area', icon: '🏊', color: '#1A6B8A' },
-  { id: 'garden', name: 'Garden', icon: '🌿', color: '#4A6741' },
-  { id: 'terrace', name: 'Terrace', icon: '☀️', color: '#B8943A' },
-  { id: 'garage', name: 'Garage', icon: '🚗', color: '#5A6E7A' },
-  { id: 'utility', name: 'Utility Room', icon: '🔧', color: '#8B3252' },
-  { id: 'guest-room', name: 'Guest Room', icon: '🏠', color: '#4A6741' },
 ];

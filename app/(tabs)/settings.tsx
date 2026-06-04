@@ -100,7 +100,7 @@ export default function SettingsScreen() {
           <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-3">About</Text>
           <View className="bg-white rounded-2xl border border-villa-border p-4 mb-4">
             <Text className="text-gray-400 text-xs leading-relaxed">
-              Villa Assistant v1.0{'\n'}
+              Meet AI v1.0{'\n'}
               Powered by Claude claude-sonnet-4-6 · iOS Speech Recognition{'\n'}
               Built for Expo SDK 56
             </Text>

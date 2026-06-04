@@ -1,6 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Session, TranscriptLine, Task, Idea, Issue, Decision, MediaItem, Location, StaffMember } from '../types';
-import { DEFAULT_LOCATIONS } from '../types';
+import { Session, TranscriptLine, Task, Idea, Issue, Decision, MediaItem, Context, StaffMember } from '../types';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -125,13 +124,7 @@ async function migrate(db: SQLite.SQLiteDatabase) {
       PRAGMA user_version = 1;
     `);
 
-    // Seed default locations
-    for (const loc of DEFAULT_LOCATIONS) {
-      await db.runAsync(
-        'INSERT OR IGNORE INTO locations (id, name, icon, color) VALUES (?, ?, ?, ?)',
-        loc.id, loc.name, loc.icon, loc.color
-      );
-    }
+    // Default context seed removed — DEFAULT_LOCATIONS constant was removed from types in ADR-003
   }
 
   // v2 — replace qr_code/description with reference_image_uri/ai_description
@@ -141,6 +134,53 @@ async function migrate(db: SQLite.SQLiteDatabase) {
     try { await db.runAsync('ALTER TABLE locations ADD COLUMN ai_description TEXT'); } catch {}
     await db.runAsync('PRAGMA user_version = 2');
   }
+
+  // v3 — context model (ADR-003), identity model (ADR-004), sync + soft-delete (ADR-005)
+  if (user_version < 3) {
+    // 1. Rename locations → contexts only if locations still exists.
+    //    If this migration ran partially before (renamed but crashed before user_version=3),
+    //    'locations' is already gone and we skip safely.
+    const locationsExists = await db.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='locations'"
+    );
+    if (locationsExists) {
+      await db.runAsync('ALTER TABLE locations RENAME TO contexts');
+    }
+
+    // 2. contexts — context_type discriminator (ADR-003)
+    try { await db.runAsync("ALTER TABLE contexts ADD COLUMN context_type TEXT NOT NULL DEFAULT 'space'"); } catch {}
+
+    // 3. sessions — sync timestamps + soft-delete (ADR-005)
+    try { await db.runAsync('ALTER TABLE sessions ADD COLUMN synced_at INTEGER'); } catch {}
+    try { await db.runAsync('ALTER TABLE sessions ADD COLUMN last_synced_at INTEGER'); } catch {}
+    try { await db.runAsync('ALTER TABLE sessions ADD COLUMN deleted_at INTEGER'); } catch {}
+
+    // 4. tasks — sync timestamp + soft-delete (ADR-005)
+    try { await db.runAsync('ALTER TABLE tasks ADD COLUMN synced_at INTEGER'); } catch {}
+    try { await db.runAsync('ALTER TABLE tasks ADD COLUMN deleted_at INTEGER'); } catch {}
+
+    // 5. ideas — soft-delete (ADR-005)
+    try { await db.runAsync('ALTER TABLE ideas ADD COLUMN deleted_at INTEGER'); } catch {}
+
+    // 6. issues — soft-delete (ADR-005)
+    try { await db.runAsync('ALTER TABLE issues ADD COLUMN deleted_at INTEGER'); } catch {}
+
+    // 7. decisions — soft-delete (ADR-005)
+    try { await db.runAsync('ALTER TABLE decisions ADD COLUMN deleted_at INTEGER'); } catch {}
+
+    // 8. transcript_lines — soft-delete (ADR-005)
+    try { await db.runAsync('ALTER TABLE transcript_lines ADD COLUMN deleted_at INTEGER'); } catch {}
+
+    // 9. staff — identity/auth columns (ADR-004)
+    try { await db.runAsync('ALTER TABLE staff ADD COLUMN email TEXT'); } catch {}
+    try { await db.runAsync("ALTER TABLE staff ADD COLUMN role_level TEXT NOT NULL DEFAULT 'member'"); } catch {}
+    try { await db.runAsync('ALTER TABLE staff ADD COLUMN invite_code TEXT'); } catch {}
+    try { await db.runAsync('ALTER TABLE staff ADD COLUMN supabase_user_id TEXT'); } catch {}
+    try { await db.runAsync('ALTER TABLE staff ADD COLUMN avatar_url TEXT'); } catch {}
+
+    // Commit point — only reached if no unhandled throws above
+    await db.runAsync('PRAGMA user_version = 3');
+  }
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
@@ -149,7 +189,7 @@ export async function createSession(session: Omit<Session, 'participant_ids' | '
   const db = await getDb();
   await db.runAsync(
     'INSERT INTO sessions (id, title, location_id, started_at, status) VALUES (?, ?, ?, ?, ?)',
-    session.id, session.title, session.location_id ?? null, session.started_at, session.status
+    session.id, session.title, session.context_id ?? null, session.started_at, session.status
   );
 }
 
@@ -158,7 +198,7 @@ export async function updateSession(id: string, updates: Partial<Session>): Prom
   const fields: string[] = [];
   const values: (string | number | null)[] = [];
   if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title); }
-  if (updates.location_id !== undefined) { fields.push('location_id = ?'); values.push(updates.location_id ?? null); }
+  if (updates.context_id !== undefined) { fields.push('location_id = ?'); values.push(updates.context_id ?? null); }
   if (updates.ended_at !== undefined) { fields.push('ended_at = ?'); values.push(updates.ended_at ?? null); }
   if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
   if (updates.summary !== undefined) { fields.push('summary = ?'); values.push(updates.summary ?? null); }
@@ -171,16 +211,16 @@ export async function updateSession(id: string, updates: Partial<Session>): Prom
 export async function getSessions(): Promise<Session[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<{
-    id: string; title: string; location_id: string | null; location_name: string | null;
+    id: string; title: string; location_id: string | null; context_name: string | null;
     started_at: number; ended_at: number | null; status: string; summary: string | null;
     audio_uri: string | null; task_count: number; idea_count: number;
   }>(`
     SELECT s.*,
-      l.name as location_name,
+      l.name as context_name,
       (SELECT COUNT(*) FROM tasks t WHERE t.session_id = s.id) as task_count,
       (SELECT COUNT(*) FROM ideas i WHERE i.session_id = s.id) as idea_count
     FROM sessions s
-    LEFT JOIN locations l ON s.location_id = l.id
+    LEFT JOIN contexts l ON s.location_id = l.id
     ORDER BY s.started_at DESC
   `);
 
@@ -191,8 +231,8 @@ export async function getSessions(): Promise<Session[]> {
     );
     return {
       ...row,
-      location_id: row.location_id ?? undefined,
-      location_name: row.location_name ?? undefined,
+      context_id: row.location_id ?? undefined,
+      context_name: row.context_name ?? undefined,
       ended_at: row.ended_at ?? undefined,
       status: row.status as Session['status'],
       summary: row.summary ?? undefined,
@@ -208,11 +248,11 @@ export async function getSessions(): Promise<Session[]> {
 export async function getSession(id: string): Promise<Session | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<{
-    id: string; title: string; location_id: string | null; location_name: string | null;
+    id: string; title: string; location_id: string | null; context_name: string | null;
     started_at: number; ended_at: number | null; status: string; summary: string | null; audio_uri: string | null;
   }>(`
-    SELECT s.*, l.name as location_name
-    FROM sessions s LEFT JOIN locations l ON s.location_id = l.id
+    SELECT s.*, l.name as context_name
+    FROM sessions s LEFT JOIN contexts l ON s.location_id = l.id
     WHERE s.id = ?
   `, id);
   if (!row) return null;
@@ -222,8 +262,8 @@ export async function getSession(id: string): Promise<Session | null> {
   );
   return {
     ...row,
-    location_id: row.location_id ?? undefined,
-    location_name: row.location_name ?? undefined,
+    context_id: row.location_id ?? undefined,
+    context_name: row.context_name ?? undefined,
     ended_at: row.ended_at ?? undefined,
     status: row.status as Session['status'],
     summary: row.summary ?? undefined,
@@ -257,11 +297,11 @@ export async function addParticipant(sessionId: string, staffId: string): Promis
 
 // ── Transcript ─────────────────────────────────────────────────────────────────
 
-export async function addTranscriptLine(line: Omit<TranscriptLine, 'speaker_name' | 'speaker_color' | 'location_name'>): Promise<void> {
+export async function addTranscriptLine(line: Omit<TranscriptLine, 'speaker_name' | 'speaker_color' | 'context_name'>): Promise<void> {
   const db = await getDb();
   await db.runAsync(
     'INSERT INTO transcript_lines (id, session_id, speaker_id, text, start_time, end_time, timestamp, location_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    line.id, line.session_id, line.speaker_id, line.text, line.start_time, line.end_time, line.timestamp, line.location_id ?? null
+    line.id, line.session_id, line.speaker_id, line.text, line.start_time, line.end_time, line.timestamp, line.context_id ?? null
   );
 }
 
@@ -270,23 +310,23 @@ export async function getTranscriptLines(sessionId: string): Promise<TranscriptL
   const rows = await db.getAllAsync<{
     id: string; session_id: string; speaker_id: string; text: string;
     start_time: number; end_time: number; timestamp: number;
-    location_id: string | null; location_name: string | null;
+    location_id: string | null; context_name: string | null;
     speaker_name: string | null; speaker_color: string | null;
   }>(`
     SELECT tl.*,
-      l.name as location_name,
+      l.name as context_name,
       COALESCE(st.name, 'You') as speaker_name,
       COALESCE(st.color, '#1E3A5F') as speaker_color
     FROM transcript_lines tl
-    LEFT JOIN locations l ON tl.location_id = l.id
+    LEFT JOIN contexts l ON tl.location_id = l.id
     LEFT JOIN staff st ON tl.speaker_id = st.id
     WHERE tl.session_id = ?
     ORDER BY tl.start_time ASC
   `, sessionId);
   return rows.map(r => ({
     ...r,
-    location_id: r.location_id ?? undefined,
-    location_name: r.location_name ?? undefined,
+    context_id: r.location_id ?? undefined,
+    context_name: r.context_name ?? undefined,
     speaker_name: r.speaker_name ?? 'You',
     speaker_color: r.speaker_color ?? '#1E3A5F',
   }));
@@ -309,7 +349,7 @@ export async function getTasks(sessionId: string): Promise<Task[]> {
     `SELECT t.*, st.name as assigned_to_name, l.name as location_name
      FROM tasks t
      LEFT JOIN staff st ON t.assigned_to = st.id
-     LEFT JOIN locations l ON t.location_id = l.id
+     LEFT JOIN contexts l ON t.location_id = l.id
      WHERE t.session_id = ?
      ORDER BY t.created_at ASC`, sessionId
   );
@@ -328,7 +368,7 @@ export async function getAllOpenTasks(): Promise<(Task & { session_title: string
      FROM tasks t
      JOIN sessions s ON t.session_id = s.id
      LEFT JOIN staff st ON t.assigned_to = st.id
-     LEFT JOIN locations l ON t.location_id = l.id
+     LEFT JOIN contexts l ON t.location_id = l.id
      WHERE t.status = 'open'
      ORDER BY t.created_at DESC`
   );
@@ -370,7 +410,7 @@ export async function getIssues(sessionId: string): Promise<Issue[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<Issue & { location_name: string | null }>(
     `SELECT i.*, l.name as location_name FROM issues i
-     LEFT JOIN locations l ON i.location_id = l.id
+     LEFT JOIN contexts l ON i.location_id = l.id
      WHERE i.session_id = ? ORDER BY i.created_at ASC`, sessionId
   );
   return rows.map(r => ({ ...r, location_name: r.location_name ?? undefined }));
@@ -407,25 +447,34 @@ export async function getMediaItems(sessionId: string): Promise<MediaItem[]> {
   return db.getAllAsync<MediaItem>('SELECT * FROM media_items WHERE session_id = ? ORDER BY created_at ASC', sessionId);
 }
 
-// ── Locations ─────────────────────────────────────────────────────────────────
+// ── Contexts (formerly Locations) ─────────────────────────────────────────────
 
-export async function getLocations(): Promise<Location[]> {
+export async function getContexts(): Promise<Context[]> {
   const db = await getDb();
-  return db.getAllAsync<Location>('SELECT * FROM locations ORDER BY name ASC');
+  return db.getAllAsync<Context>('SELECT * FROM contexts ORDER BY name ASC');
 }
 
-export async function upsertLocation(loc: Location): Promise<void> {
+/** @deprecated use getContexts */
+export const getLocations = getContexts;
+
+export async function upsertContext(ctx: Context): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    'INSERT OR REPLACE INTO locations (id, name, icon, color, reference_image_uri, ai_description) VALUES (?, ?, ?, ?, ?, ?)',
-    loc.id, loc.name, loc.icon, loc.color, loc.reference_image_uri ?? null, loc.ai_description ?? null
+    'INSERT OR REPLACE INTO contexts (id, name, icon, color, reference_image_uri, ai_description, context_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ctx.id, ctx.name, ctx.icon, ctx.color, ctx.reference_image_uri ?? null, ctx.ai_description ?? null, ctx.context_type
   );
 }
 
-export async function deleteLocation(id: string): Promise<void> {
+/** @deprecated use upsertContext */
+export const upsertLocation = upsertContext;
+
+export async function deleteContext(id: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync('DELETE FROM locations WHERE id = ?', id);
+  await db.runAsync('DELETE FROM contexts WHERE id = ?', id);
 }
+
+/** @deprecated use deleteContext */
+export const deleteLocation = deleteContext;
 
 // ── Staff ──────────────────────────────────────────────────────────────────────
 
