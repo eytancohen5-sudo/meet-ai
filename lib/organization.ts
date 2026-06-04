@@ -1,8 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { TranscriptLine, OrganizedSession, StaffMember, Context } from '../types';
 
-const client = new Anthropic();
-
 export async function organizeSession(
   transcript: TranscriptLine[],
   staff: StaffMember[],
@@ -10,7 +8,8 @@ export async function organizeSession(
   sessionTitle: string,
   apiKey?: string
 ): Promise<OrganizedSession> {
-  const anthropic = apiKey ? new Anthropic({ apiKey }) : client;
+  if (!apiKey) throw new Error('API key not configured. Add your Anthropic API key in Settings.');
+  const anthropic = new Anthropic({ apiKey });
 
   const staffMap = Object.fromEntries(staff.map(s => [s.id, s.name]));
   const locationMap = Object.fromEntries(locations.map(l => [l.id, l.name]));
