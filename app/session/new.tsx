@@ -151,7 +151,7 @@ export default function NewSessionScreen() {
           <View className="bg-gray-50 rounded-xl p-4 mb-6 flex-row items-center gap-3">
             <Ionicons name="person-add-outline" size={20} color="#9ca3af" />
             <Text className="text-gray-400 text-sm flex-1">
-              No staff added yet. Add staff in the Spaces tab.
+              No staff added yet. Head to the Spaces tab to add people.
             </Text>
           </View>
         ) : (
@@ -193,7 +193,7 @@ export default function NewSessionScreen() {
         <View className="bg-amber-50 rounded-xl p-3 mb-6 flex-row gap-2">
           <Ionicons name="mic-outline" size={16} color="#92400e" />
           <Text className="flex-1 text-xs text-amber-800 leading-relaxed">
-            Recording will start immediately. You can change the context while walking.
+            Recording starts the moment you tap. Change the context at any time.
           </Text>
         </View>
       </ScrollView>

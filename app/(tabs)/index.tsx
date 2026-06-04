@@ -61,7 +61,7 @@ export default function SessionsScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-5">
         <Text className="text-white text-2xl font-bold tracking-tight">Meet AI</Text>
-        <Text className="text-navy-400 text-sm mt-1">AI-powered team meeting recorder</Text>
+        <Text className="text-navy-400 text-sm mt-1">Your meetings, on the record.</Text>
       </View>
 
       <View className="flex-1 bg-villa-bg rounded-t-3xl">
@@ -78,7 +78,7 @@ export default function SessionsScreen() {
             >
               <View className="w-2.5 h-2.5 bg-white rounded-full mr-3 opacity-90" />
               <View className="flex-1">
-                <Text className="text-white font-semibold text-sm">Session in progress</Text>
+                <Text className="text-white font-semibold text-sm">Still going</Text>
                 <Text className="text-red-100 text-xs mt-0.5" numberOfLines={1}>{activeSession.title}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
@@ -88,9 +88,9 @@ export default function SessionsScreen() {
           {sessions.length === 0 ? (
             <View className="items-center py-16">
               <Ionicons name="mic-outline" size={56} color="#D9E2EC" />
-              <Text className="text-navy-800 font-semibold text-lg mt-4">No sessions yet</Text>
+              <Text className="text-navy-800 font-semibold text-lg mt-4">Nothing here yet.</Text>
               <Text className="text-navy-400 text-sm mt-2 text-center px-8">
-                Start your first walkthrough meeting to begin capturing tasks and ideas.
+                Hit the button below to start your first walkthrough. It listens so you don't have to remember.
               </Text>
             </View>
           ) : (

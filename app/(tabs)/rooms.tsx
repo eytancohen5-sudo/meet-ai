@@ -110,7 +110,7 @@ export default function RoomsScreen() {
       setRoomNameInput(result.suggested_name);
     } catch (err) {
       console.error('Vision error:', err);
-      Alert.alert('Could not identify context', 'AI analysis failed. You can still name it manually.');
+      Alert.alert('Could not identify context', 'AI analysis failed. You can still name it yourself.');
       setAiResult({ suggested_name: 'New Context', description: '', icon: '📍' });
       setRoomNameInput('New Context');
     } finally {
@@ -194,7 +194,7 @@ export default function RoomsScreen() {
 
   const handleInvite = async (member: StaffMember) => {
     if (!member.email) {
-      Alert.alert('No email', 'Add this person\'s email first before sending an invite.');
+      Alert.alert('No email on file', 'Add their email address first, then you can send an invite.');
       return;
     }
     try {
@@ -213,7 +213,7 @@ export default function RoomsScreen() {
     <SafeAreaView className="flex-1 bg-navy-800">
       <View className="px-5 pt-4 pb-5">
         <Text className="text-white text-2xl font-bold tracking-tight">Your Villa</Text>
-        <Text className="text-navy-400 text-sm mt-1">Contexts & staff</Text>
+        <Text className="text-navy-400 text-sm mt-1">Spaces, contexts, people.</Text>
       </View>
 
       <View className="flex-1 bg-villa-bg rounded-t-3xl">
@@ -282,9 +282,9 @@ export default function RoomsScreen() {
                 <View className="w-12 h-12 bg-navy-50 rounded-full items-center justify-center mb-2">
                   <Ionicons name="camera-outline" size={24} color="#1E3A5F" />
                 </View>
-                <Text className="text-navy-800 font-semibold text-sm">Add Context with Photo</Text>
+                <Text className="text-navy-800 font-semibold text-sm">Add a Context</Text>
                 <Text className="text-gray-400 text-xs mt-1 text-center">
-                  Take a photo — AI will identify the space automatically
+                  Snap a photo and AI names it for you.
                 </Text>
               </TouchableOpacity>
             </>
@@ -318,7 +318,7 @@ export default function RoomsScreen() {
                 onPress={() => setShowAddStaff(true)}
               >
                 <Ionicons name="person-add-outline" size={24} color="#9ca3af" />
-                <Text className="text-gray-400 text-sm mt-1">Add Staff Member</Text>
+                <Text className="text-gray-400 text-sm mt-1">Add Someone</Text>
               </TouchableOpacity>
             </>
           )}
@@ -333,7 +333,7 @@ export default function RoomsScreen() {
               <Ionicons name="close" size={24} color="#1E3A5F" />
             </TouchableOpacity>
             <Text className="text-navy-800 text-lg font-bold flex-1">
-              {addStep === 'photo' ? 'Add Context' : 'Confirm Context'}
+              {addStep === 'photo' ? 'Add Context' : 'Looks right?'}
             </Text>
           </View>
 
@@ -345,10 +345,10 @@ export default function RoomsScreen() {
                   <Ionicons name="camera" size={32} color="#1E3A5F" />
                 </View>
                 <Text className="text-navy-800 font-semibold text-base text-center">
-                  Point your camera at the context
+                  Point at the space.
                 </Text>
                 <Text className="text-navy-400 text-sm mt-2 text-center leading-relaxed">
-                  Claude will automatically identify the space and name it for you
+                  Claude reads the room. Literally.
                 </Text>
               </View>
 
@@ -383,7 +383,7 @@ export default function RoomsScreen() {
                   {identifying && (
                     <View className="absolute inset-0 bg-black/40 items-center justify-center">
                       <ActivityIndicator color="white" size="large" />
-                      <Text className="text-white font-medium mt-3">Analysing context...</Text>
+                      <Text className="text-white font-medium mt-3">Working on it...</Text>
                     </View>
                   )}
                 </View>
@@ -394,7 +394,7 @@ export default function RoomsScreen() {
                 <View className="bg-green-50 border border-green-100 rounded-xl p-3 mb-4 flex-row gap-2">
                   <Ionicons name="sparkles-outline" size={18} color="#15803d" />
                   <View className="flex-1">
-                    <Text className="text-green-800 font-medium text-sm">AI identified this context</Text>
+                    <Text className="text-green-800 font-medium text-sm">AI's best guess</Text>
                     <Text className="text-green-600 text-xs mt-1 leading-relaxed">
                       {aiResult.description}
                     </Text>
@@ -420,7 +420,7 @@ export default function RoomsScreen() {
               </ScrollView>
 
               {/* Context name */}
-              <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Context Name</Text>
+              <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Name</Text>
               <TextInput
                 className="border border-gray-200 rounded-xl px-4 py-3.5 text-gray-800 text-base mb-6"
                 value={roomNameInput}
@@ -436,7 +436,7 @@ export default function RoomsScreen() {
                 onPress={() => { setAddStep('photo'); setCapturedImageUri(null); setAiResult(null); }}
               >
                 <Ionicons name="refresh-outline" size={16} color="#6b7280" />
-                <Text className="text-gray-500 text-sm">Take a different photo</Text>
+                <Text className="text-gray-500 text-sm">Try a different photo</Text>
               </TouchableOpacity>
 
               <View className="flex-row gap-3">
@@ -451,7 +451,7 @@ export default function RoomsScreen() {
                   onPress={saveRoom}
                   disabled={identifying || !roomNameInput.trim()}
                 >
-                  <Text className="text-white font-semibold">Save Context</Text>
+                  <Text className="text-white font-semibold">Save</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -462,7 +462,7 @@ export default function RoomsScreen() {
       {/* ── Add Staff Modal ── */}
       <Modal visible={showAddStaff} animationType="slide" presentationStyle="pageSheet">
         <View className="flex-1 bg-white p-6">
-          <Text className="text-navy-800 text-xl font-bold mb-6">Add Staff Member</Text>
+          <Text className="text-navy-800 text-xl font-bold mb-6">Add Someone</Text>
 
           <Text className="text-gray-600 text-sm mb-2 font-medium">Name</Text>
           <TextInput
@@ -492,7 +492,7 @@ export default function RoomsScreen() {
               className="flex-1 py-4 bg-navy-800 rounded-xl items-center"
               onPress={addStaff}
             >
-              <Text className="text-white font-semibold">Add Staff</Text>
+              <Text className="text-white font-semibold">Add</Text>
             </TouchableOpacity>
           </View>
         </View>

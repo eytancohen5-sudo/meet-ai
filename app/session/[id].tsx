@@ -184,11 +184,11 @@ export default function ActiveSessionScreen() {
       'What would you like to do?',
       [
         {
-          text: '📸  Attach photo to transcript',
+          text: '📸  Attach a photo',
           onPress: () => captureAndAttach(),
         },
         {
-          text: '📍  Identify where I am',
+          text: '📍  Where am I?',
           onPress: () => captureAndIdentifyContext(),
         },
         { text: 'Cancel', style: 'cancel' },
@@ -210,7 +210,7 @@ export default function ActiveSessionScreen() {
         type: (asset.type === 'video' ? 'video' : 'photo') as 'photo' | 'video',
         created_at: Date.now(),
       });
-      Alert.alert('📎 Attached', 'Photo linked to this moment in the session.');
+      Alert.alert('📎 Attached', 'Photo linked to this moment.');
     }
   };
 
@@ -235,24 +235,24 @@ export default function ActiveSessionScreen() {
         await updateSession(id, { context_id: match.matched_id });
         Alert.alert(
           `📍 ${match.matched_name}`,
-          `Context updated${match.confidence >= 0.85 ? '' : ' (matched with moderate confidence)'}.`,
+          `Context updated${match.confidence >= 0.85 ? '' : ' — moderate confidence'}.`,
           [{ text: 'OK' }]
         );
       } else if (match.matched_id && match.confidence >= 0.4) {
         // Lower confidence — ask user to confirm
         Alert.alert(
-          'Context Match',
-          `This looks like "${match.matched_name}" — is that right?`,
+          'Is this right?',
+          `Looks like ${match.matched_name} to me.`,
           [
             {
-              text: `Yes, I'm in ${match.matched_name}`,
+              text: `Yes — ${match.matched_name}`,
               onPress: async () => {
                 session.updateContext(match.matched_id!, match.matched_name!);
                 await updateSession(id, { context_id: match.matched_id! });
               },
             },
             {
-              text: 'No, pick manually',
+              text: 'No, pick myself',
               onPress: () => setShowContextPicker(true),
             },
             { text: 'Cancel', style: 'cancel' },
@@ -261,18 +261,18 @@ export default function ActiveSessionScreen() {
       } else {
         // No match — show manual picker with the suggested name
         Alert.alert(
-          'Context Not Recognised',
+          'Not in your list',
           `This looks like "${match.suggested_name}" but it's not in your saved contexts. Pick a context manually or add this one in Spaces.`,
           [
-            { text: 'Pick Manually', onPress: () => setShowContextPicker(true) },
+            { text: 'Pick from list', onPress: () => setShowContextPicker(true) },
             { text: 'Cancel', style: 'cancel' },
           ]
         );
       }
     } catch (err) {
       console.error('Context identification failed:', err);
-      Alert.alert('Could Not Identify', 'AI identification failed. Pick the context manually.', [
-        { text: 'Pick Manually', onPress: () => setShowContextPicker(true) },
+      Alert.alert('Could Not Identify', 'AI identification failed. Pick it from the list.', [
+        { text: 'Pick from list', onPress: () => setShowContextPicker(true) },
         { text: 'Cancel', style: 'cancel' },
       ]);
     } finally {
@@ -323,7 +323,7 @@ export default function ActiveSessionScreen() {
         >
           <Ionicons name="location" size={14} color="#C9A84C" />
           <Text className="text-white text-sm font-medium">
-            {session.currentContextName ?? 'Tap to set context'}
+            {session.currentContextName ?? 'Where are you?'}
           </Text>
           <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.5)" />
         </TouchableOpacity>
@@ -341,7 +341,7 @@ export default function ActiveSessionScreen() {
             <View className="items-center py-12">
               <Ionicons name="mic-outline" size={40} color="#D9E2EC" />
               <Text className="text-gray-400 text-sm mt-3 text-center">
-                Listening... Start talking to see your transcript here.
+                Listening. Say something.
               </Text>
             </View>
           ) : (
@@ -427,7 +427,7 @@ export default function ActiveSessionScreen() {
       <Modal visible={showContextPicker} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView className="flex-1 bg-white">
           <View className="flex-row items-center px-5 pt-4 pb-4 border-b border-gray-100">
-            <Text className="text-navy-800 text-lg font-bold flex-1">Change Context</Text>
+            <Text className="text-navy-800 text-lg font-bold flex-1">Where are you?</Text>
             <TouchableOpacity onPress={() => setShowContextPicker(false)}>
               <Ionicons name="close" size={24} color="#1E3A5F" />
             </TouchableOpacity>
@@ -474,7 +474,7 @@ export default function ActiveSessionScreen() {
           </View>
           <FlatList
             data={[
-              { id: 'me', name: 'You (Owner)', color: '#1E3A5F', avatar_initials: 'ME', role: '' },
+              { id: 'me', name: 'You', color: '#1E3A5F', avatar_initials: 'ME', role: '' },
               ...staff.filter(s => session.participantIds.includes(s.id)),
             ]}
             keyExtractor={item => item.id}

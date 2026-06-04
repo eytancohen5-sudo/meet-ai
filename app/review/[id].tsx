@@ -231,8 +231,8 @@ export default function ReviewScreen() {
         <View className="absolute inset-0 bg-black/50 z-50 items-center justify-center">
           <View className="bg-white rounded-2xl p-6 items-center mx-8">
             <ActivityIndicator color="#1E3A5F" size="large" />
-            <Text className="text-navy-800 font-semibold text-base mt-4">Organizing with AI...</Text>
-            <Text className="text-gray-400 text-sm mt-1 text-center">Extracting tasks, ideas, and decisions</Text>
+            <Text className="text-navy-800 font-semibold text-base mt-4">Reading the room...</Text>
+            <Text className="text-gray-400 text-sm mt-1 text-center">Sorting out what matters.</Text>
           </View>
         </View>
       )}
@@ -300,7 +300,7 @@ export default function ReviewScreen() {
               {/* Issues */}
               {issues.length > 0 && (
                 <View className="mb-4">
-                  <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Issues Found</Text>
+                  <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Issues</Text>
                   {issues.map(issue => (
                     <View key={issue.id} className="bg-white rounded-xl border border-villa-border p-3 mb-2">
                       <View className="flex-row items-center gap-2">
@@ -321,7 +321,7 @@ export default function ReviewScreen() {
               {/* Ideas */}
               {ideas.length > 0 && (
                 <View className="mb-4">
-                  <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Ideas & Suggestions</Text>
+                  <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Ideas</Text>
                   {ideas.map(idea => (
                     <View key={idea.id} className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-2 flex-row gap-2">
                       <Text className="text-lg">💡</Text>
@@ -339,7 +339,7 @@ export default function ReviewScreen() {
               {/* Decisions */}
               {decisions.length > 0 && (
                 <View className="mb-4">
-                  <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Decisions Made</Text>
+                  <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Decisions</Text>
                   {decisions.map(d => (
                     <View key={d.id} className="bg-green-50 border border-green-100 rounded-xl p-3 mb-2 flex-row gap-2">
                       <Ionicons name="checkmark-done-outline" size={16} color="#15803d" />
@@ -356,7 +356,7 @@ export default function ReviewScreen() {
                 >
                   <Ionicons name="sparkles-outline" size={28} color="#C9A84C" />
                   <Text className="text-navy-800 font-semibold mt-2">Organize with AI</Text>
-                  <Text className="text-gray-400 text-xs mt-1 text-center">Extract tasks, ideas, and decisions from your transcript</Text>
+                  <Text className="text-gray-400 text-xs mt-1 text-center">Pull what matters out of the transcript.</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -367,7 +367,7 @@ export default function ReviewScreen() {
               {tasks.length === 0 ? (
                 <View className="items-center py-12">
                   <Ionicons name="checkbox-outline" size={40} color="#D9E2EC" />
-                  <Text className="text-gray-400 text-sm mt-3 text-center">No tasks extracted yet</Text>
+                  <Text className="text-gray-400 text-sm mt-3 text-center">No tasks found.</Text>
                 </View>
               ) : (
                 tasks.map(task => (
@@ -385,14 +385,14 @@ export default function ReviewScreen() {
                   onPress={stopPlayback}
                 >
                   <View className="w-2 h-2 rounded-full bg-red-500" />
-                  <Text className="text-navy-800 text-sm flex-1">Playing audio...</Text>
+                  <Text className="text-navy-800 text-sm flex-1">Playing audio</Text>
                   <Ionicons name="stop-circle-outline" size={18} color="#1E3A5F" />
                 </TouchableOpacity>
               )}
               {transcript.length === 0 ? (
                 <View className="items-center py-12">
                   <Ionicons name="chatbubbles-outline" size={40} color="#D9E2EC" />
-                  <Text className="text-gray-400 text-sm mt-3">No transcript recorded</Text>
+                  <Text className="text-gray-400 text-sm mt-3">Nothing recorded.</Text>
                 </View>
               ) : (
                 transcript.map(line => (
