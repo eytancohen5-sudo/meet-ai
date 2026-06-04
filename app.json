@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.meetai.app",
@@ -31,7 +31,8 @@
           "microphonePermission": "Meet AI needs microphone access to record meetings.",
           "speechRecognitionPermission": "Meet AI uses speech recognition to transcribe your meetings."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
