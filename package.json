@@ -1,22 +1,56 @@
 {
   "name": "villaassistant",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
+    "@expo/vector-icons": "^15.1.1",
+    "@jamsch/expo-speech-recognition": "^0.2.15",
+    "@supabase/supabase-js": "^2.107.0",
     "expo": "~56.0.8",
+    "expo-av": "^16.0.8",
+    "expo-barcode-scanner": "^13.0.1",
+    "expo-camera": "^56.0.7",
+    "expo-file-system": "^56.0.7",
+    "expo-image-picker": "^56.0.15",
+    "expo-media-library": "^56.0.6",
+    "expo-router": "^56.2.8",
+    "expo-sharing": "^56.0.15",
+    "expo-sqlite": "^56.0.4",
     "expo-status-bar": "~56.0.4",
+    "nativewind": "^4.2.4",
     "react": "19.2.3",
-    "react-native": "0.85.3"
+    "react-native": "0.85.3",
+    "react-native-gesture-handler": "^3.0.0",
+    "react-native-reanimated": "^4.4.1",
+    "react-native-safe-area-context": "^5.8.0",
+    "react-native-screens": "^4.25.2",
+    "tailwindcss": "^3.4.17",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^13.3.3",
     "@types/react": "~19.2.2",
+    "jest-expo": "^56.0.4",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest --watchAll=false",
+    "test:watch": "jest"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "setupFilesAfterFramework": [
+      "@testing-library/jest-native/extend-expect"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|nativewind)"
+    ]
   },
   "private": true
 }

@@ -1,25 +1,37 @@
 {
   "expo": {
-    "name": "VillaAssistant",
-    "slug": "VillaAssistant",
+    "name": "Villa Assistant",
+    "slug": "villa-assistant",
     "version": "1.0.0",
+    "scheme": "villaassistant",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.villa.assistant",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Villa Assistant uses speech recognition to transcribe your meetings.",
+        "NSMicrophoneUsageDescription": "Villa Assistant needs microphone access to record meetings.",
+        "NSCameraUsageDescription": "Villa Assistant uses the camera to document issues and tasks.",
+        "NSPhotoLibraryUsageDescription": "Villa Assistant saves photos from your meetings.",
+        "NSLocationWhenInUseUsageDescription": "Villa Assistant can use location to help tag meeting context."
+      }
     },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "plugins": [
+      "expo-router",
+      "expo-av",
+      "expo-camera",
+      "expo-image-picker",
+      "expo-media-library",
+      ["@jamsch/expo-speech-recognition", {
+        "microphonePermission": "Villa Assistant needs microphone access to record meetings.",
+        "speechRecognitionPermission": "Villa Assistant uses speech recognition to transcribe your meetings."
+      }]
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
