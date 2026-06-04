@@ -17,6 +17,7 @@ export default function NewSessionScreen() {
   const [selectedContext, setSelectedContext] = useState<Context | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Set<string>>(new Set());
   const [title, setTitle] = useState('');
+  const [showTitle, setShowTitle] = useState(false);
   const [starting, setStarting] = useState(false);
 
   const startSession = useActiveSession(s => s.startSession);
@@ -107,16 +108,6 @@ export default function NewSessionScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Session Title */}
-        <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2">Session Title</Text>
-        <TextInput
-          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-800 text-base mb-6"
-          value={title}
-          onChangeText={setTitle}
-          placeholder="e.g. Monday Walkthrough"
-          returnKeyType="done"
-        />
-
         {/* Context */}
         <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-3">Starting Context</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
@@ -151,7 +142,7 @@ export default function NewSessionScreen() {
           <View className="bg-gray-50 rounded-xl p-4 mb-6 flex-row items-center gap-3">
             <Ionicons name="person-add-outline" size={20} color="#9ca3af" />
             <Text className="text-gray-400 text-sm flex-1">
-              No staff added yet. Head to the Spaces tab to add people.
+              No team members added yet. Head to the Team tab to add people.
             </Text>
           </View>
         ) : (
@@ -187,6 +178,26 @@ export default function NewSessionScreen() {
               );
             })}
           </View>
+        )}
+
+        {/* Session Title — collapsed by default */}
+        <TouchableOpacity
+          className="flex-row items-center gap-2 mb-3"
+          onPress={() => setShowTitle(v => !v)}
+        >
+          <Ionicons name={showTitle ? 'chevron-down' : 'chevron-forward'} size={14} color="#9ca3af" />
+          <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wide">
+            {showTitle ? 'Session Title' : `Title: ${title}`}
+          </Text>
+        </TouchableOpacity>
+        {showTitle && (
+          <TextInput
+            className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-800 text-base mb-4"
+            value={title}
+            onChangeText={setTitle}
+            placeholder="e.g. Monday Check-in"
+            returnKeyType="done"
+          />
         )}
 
         {/* Note */}

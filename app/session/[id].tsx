@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Alert, SafeAreaView, Modal, FlatList, Image, ActivityIndicator, Platform,
+  Alert, SafeAreaView, Modal, FlatList, Image, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -11,8 +11,6 @@ import { useActiveSession } from '../../stores/session';
 import {
   addTranscriptLine, addMediaItem, updateSession, getContexts, getStaff,
 } from '../../lib/database';
-import { identifyContextFromPhoto } from '../../lib/vision';
-import { useSettings } from '../../stores/settings';
 import { stopRecording, pauseRecording, resumeRecording, saveAudioToDocuments, formatDuration, getRecordingElapsed } from '../../lib/transcription';
 import { TranscriptLineView } from '../../components/TranscriptLine';
 import { TranscriptLine, Context, StaffMember } from '../../types';
@@ -27,14 +25,9 @@ export default function ActiveSessionScreen() {
   const [contexts, setContexts] = useState<Context[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [showContextPicker, setShowContextPicker] = useState(false);
-  const [showSpeakerPicker, setShowSpeakerPicker] = useState(false);
   const [activeSpeakerId, setActiveSpeakerId] = useState<string>('me');
   const [pendingText, setPendingText] = useState('');
   const [isStopping, setIsStopping] = useState(false);
-  const [identifyingLocation, setIdentifyingLocation] = useState(false);
-
-  const { anthropicApiKey } = useSettings();
-
   // Speech recognition
   const recognitionStartTime = useRef(Date.now());
 
@@ -178,25 +171,7 @@ export default function ActiveSessionScreen() {
     await updateSession(id, { context_id: ctx.id });
   };
 
-  const handleCameraPress = () => {
-    Alert.alert(
-      'Camera',
-      'What would you like to do?',
-      [
-        {
-          text: '📸  Attach a photo',
-          onPress: () => captureAndAttach(),
-        },
-        {
-          text: '📍  Where am I?',
-          onPress: () => captureAndIdentifyContext(),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  };
-
-  const captureAndAttach = async () => {
+  const handleCameraPress = async () => {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images', 'videos'],
       quality: 0.8,
@@ -210,73 +185,6 @@ export default function ActiveSessionScreen() {
         type: (asset.type === 'video' ? 'video' : 'photo') as 'photo' | 'video',
         created_at: Date.now(),
       });
-      Alert.alert('📎 Attached', 'Photo linked to this moment.');
-    }
-  };
-
-  const captureAndIdentifyContext = async () => {
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    setIdentifyingLocation(true);
-    try {
-      const match = await identifyContextFromPhoto(
-        result.assets[0].uri,
-        contexts,
-        anthropicApiKey || undefined
-      );
-
-      if (match.matched_id && match.confidence >= 0.6) {
-        // High-confidence match — auto-tag without asking
-        session.updateContext(match.matched_id, match.matched_name ?? match.suggested_name);
-        await updateSession(id, { context_id: match.matched_id });
-        Alert.alert(
-          `📍 ${match.matched_name}`,
-          `Context updated${match.confidence >= 0.85 ? '' : ' — moderate confidence'}.`,
-          [{ text: 'OK' }]
-        );
-      } else if (match.matched_id && match.confidence >= 0.4) {
-        // Lower confidence — ask user to confirm
-        Alert.alert(
-          'Is this right?',
-          `Looks like ${match.matched_name} to me.`,
-          [
-            {
-              text: `Yes — ${match.matched_name}`,
-              onPress: async () => {
-                session.updateContext(match.matched_id!, match.matched_name!);
-                await updateSession(id, { context_id: match.matched_id! });
-              },
-            },
-            {
-              text: 'No, pick myself',
-              onPress: () => setShowContextPicker(true),
-            },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
-      } else {
-        // No match — show manual picker with the suggested name
-        Alert.alert(
-          'Not in your list',
-          `This looks like "${match.suggested_name}" but it's not in your saved contexts. Pick a context manually or add this one in Spaces.`,
-          [
-            { text: 'Pick from list', onPress: () => setShowContextPicker(true) },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
-      }
-    } catch (err) {
-      console.error('Context identification failed:', err);
-      Alert.alert('Could Not Identify', 'AI identification failed. Pick it from the list.', [
-        { text: 'Pick from list', onPress: () => setShowContextPicker(true) },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    } finally {
-      setIdentifyingLocation(false);
     }
   };
 
@@ -372,29 +280,35 @@ export default function ActiveSessionScreen() {
 
         {/* Bottom Controls */}
         <View className="bg-white border-t border-villa-border px-4 pt-3 pb-8">
-          {/* Speaker indicator */}
-          <TouchableOpacity
-            className="flex-row items-center justify-center gap-2 bg-gray-50 rounded-xl py-2.5 mb-3"
-            onPress={() => setShowSpeakerPicker(true)}
-          >
-            <View className="w-6 h-6 rounded-full items-center justify-center" style={{ backgroundColor: currentSpeaker.color + '30' }}>
-              <Text className="text-xs font-bold" style={{ color: currentSpeaker.color }}>{currentSpeaker.initials.charAt(0)}</Text>
-            </View>
-            <Text className="text-sm text-gray-600">Speaking as <Text className="font-semibold text-gray-800">{currentSpeaker.name}</Text></Text>
-            <Ionicons name="swap-horizontal-outline" size={14} color="#9ca3af" />
-          </TouchableOpacity>
+          {/* Speaker chips — tap to switch, no modal */}
+          {session.participantIds.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingBottom: 8 }}
+            >
+              {[{ id: 'me', name: 'You', color: '#1E3A5F', avatar_initials: 'ME' }, ...staff.filter(s => session.participantIds.includes(s.id))].map(p => (
+                <TouchableOpacity
+                  key={p.id}
+                  onPress={() => setActiveSpeakerId(p.id)}
+                  className={`flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border ${activeSpeakerId === p.id ? 'border-navy-800 bg-navy-100' : 'border-gray-200 bg-white'}`}
+                >
+                  <View className="w-5 h-5 rounded-full items-center justify-center" style={{ backgroundColor: p.color + '30' }}>
+                    <Text className="text-xs font-bold" style={{ color: p.color }}>{p.avatar_initials?.charAt(0) ?? '?'}</Text>
+                  </View>
+                  <Text className={`text-xs font-medium ${activeSpeakerId === p.id ? 'text-navy-800' : 'text-gray-600'}`}>{p.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
 
           {/* Action buttons */}
           <View className="flex-row items-center justify-between">
             <TouchableOpacity
               className="w-12 h-12 bg-gray-100 rounded-full items-center justify-center"
               onPress={handleCameraPress}
-              disabled={identifyingLocation}
             >
-              {identifyingLocation
-                ? <ActivityIndicator size="small" color="#1E3A5F" />
-                : <Ionicons name="camera-outline" size={22} color="#4b5563" />
-              }
+              <Ionicons name="camera-outline" size={22} color="#4b5563" />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -411,13 +325,6 @@ export default function ActiveSessionScreen() {
               style={{ shadowColor: '#ef4444', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 6 }}
             >
               <Ionicons name="stop" size={26} color="white" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="w-12 h-12 bg-gray-100 rounded-full items-center justify-center"
-              onPress={() => setShowContextPicker(true)}
-            >
-              <Ionicons name="location-outline" size={22} color="#4b5563" />
             </TouchableOpacity>
           </View>
         </View>
@@ -457,42 +364,6 @@ export default function ActiveSessionScreen() {
                     <Ionicons name="checkmark-circle" size={22} color="#1E3A5F" />
                   )}
                 </View>
-              </TouchableOpacity>
-            )}
-          />
-        </SafeAreaView>
-      </Modal>
-
-      {/* Speaker Picker Modal */}
-      <Modal visible={showSpeakerPicker} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView className="flex-1 bg-white">
-          <View className="flex-row items-center px-5 pt-4 pb-4 border-b border-gray-100">
-            <Text className="text-navy-800 text-lg font-bold flex-1">Who's Speaking?</Text>
-            <TouchableOpacity onPress={() => setShowSpeakerPicker(false)}>
-              <Ionicons name="close" size={24} color="#1E3A5F" />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={[
-              { id: 'me', name: 'You', color: '#1E3A5F', avatar_initials: 'ME', role: '' },
-              ...staff.filter(s => session.participantIds.includes(s.id)),
-            ]}
-            keyExtractor={item => item.id}
-            contentContainerStyle={{ padding: 16 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                className={`flex-row items-center p-4 mb-2 rounded-xl border ${activeSpeakerId === item.id ? 'border-navy-800 bg-navy-50' : 'border-gray-200 bg-white'}`}
-                onPress={() => { setActiveSpeakerId(item.id); setShowSpeakerPicker(false); }}
-              >
-                <View className="w-10 h-10 rounded-full items-center justify-center mr-3" style={{ backgroundColor: item.color + '30' }}>
-                  <Text className="font-bold text-sm" style={{ color: item.color }}>{item.avatar_initials?.charAt(0) ?? '?'}</Text>
-                </View>
-                <Text className={`flex-1 font-medium ${activeSpeakerId === item.id ? 'text-navy-800' : 'text-gray-800'}`}>
-                  {item.name}
-                </Text>
-                {activeSpeakerId === item.id && (
-                  <Ionicons name="checkmark-circle" size={22} color="#1E3A5F" />
-                )}
               </TouchableOpacity>
             )}
           />

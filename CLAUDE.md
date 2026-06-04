@@ -6,7 +6,7 @@ Source of truth for all agents and the main Claude Code session.
 ## 1. Project identity
 - **Project:** Meet AI — iOS mobile app for villa property managers to record, transcribe, and AI-organize staff meetings
 - **Operator:** Eytan
-- **Mission:** Help villa property managers capture actionable tasks, decisions, and insights from staff walkthroughs using voice recording + Claude AI
+- **Mission:** Help managers and team leads capture actionable tasks, decisions, and insights from meetings and walkthroughs using voice recording + Claude AI
 - **Apps in scope:**
   - `.` — The full React Native / Expo app
 
@@ -159,7 +159,8 @@ Score every non-trivial request on five axes (Intent, Scope, Constraints, Succes
 **Operational fragilities:**
 - API key missing → "Organize" silently fails; always check settings on first launch
 - SQLite migration failure → app crash on cold start; test on fresh simulator before shipping
-- `@supabase/supabase-js` in deps but NOT integrated — do not wire up without Eytan's approval
+- `@supabase/supabase-js` is in deps but the Supabase layer (auth/sync/invites) is NOT active — do not enable without explicit decision
+- Multi-user layer (lib/auth.ts, lib/sync.ts, lib/invites.ts, app/auth/, app/(member)/, app/invite/) is built but shelved — single-owner mode only until further notice
 
 ## 10. Glossary
 | Term | Definition |
@@ -174,5 +175,5 @@ Score every non-trivial request on five axes (Intent, Scope, Constraints, Succes
 | **SPEC** | champ's task validation: Specific, Programmatically evaluable, Explicit scope, Constrained output |
 | **ADR** | Architecture Decision Record |
 | **organize** | The AI step: sending a transcript to Claude and extracting tasks/ideas/issues/decisions |
-| **session** | A recorded meeting walkthrough with staff |
+| **session** | A recorded meeting or walkthrough |
 | **transcript line** | One utterance from one speaker at one timestamp, optionally tagged to a location |

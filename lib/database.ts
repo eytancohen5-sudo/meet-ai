@@ -486,9 +486,21 @@ export async function getStaff(): Promise<StaffMember[]> {
 export async function upsertStaff(member: StaffMember): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    'INSERT OR REPLACE INTO staff (id, name, role, color, voice_sample_uri, avatar_initials) VALUES (?, ?, ?, ?, ?, ?)',
-    member.id, member.name, member.role, member.color,
-    member.voice_sample_uri ?? null, member.avatar_initials
+    `INSERT OR REPLACE INTO staff
+      (id, name, role, color, voice_sample_uri, avatar_initials,
+       email, role_level, invite_code, supabase_user_id, avatar_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    member.id,
+    member.name,
+    member.role,
+    member.color,
+    member.voice_sample_uri ?? null,
+    member.avatar_initials,
+    member.email ?? null,
+    member.role_level ?? 'member',
+    member.invite_code ?? null,
+    member.supabase_user_id ?? null,
+    member.avatar_url ?? null,
   );
 }
 

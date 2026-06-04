@@ -12,7 +12,6 @@ import {
   updateTaskStatus, updateSession,
 } from '../../lib/database';
 import { organizeSession } from '../../lib/organization';
-import { syncSessionToSupabase, syncTaskUpdate } from '../../lib/sync';
 import { getContexts, getStaff } from '../../lib/database';
 import { TaskCard } from '../../components/TaskCard';
 import { TranscriptLineView } from '../../components/TranscriptLine';
@@ -74,6 +73,11 @@ export default function ReviewScreen() {
 
   const triggerOrganization = async (sess: Session, lines: TranscriptLine[]) => {
     if (organizing) return;
+    if (lines.length === 0) return;
+    // Warn if transcript is very long (>500 lines may hit token limits)
+    if (lines.length > 500) {
+      Alert.alert('Long Recording', `This session has ${lines.length} transcript lines. Organization may take longer.`, [{ text: 'OK' }]);
+    }
     setOrganizing(true);
     try {
       const [locs, staff] = await Promise.all([getContexts(), getStaff()]);
@@ -106,13 +110,23 @@ export default function ReviewScreen() {
         ),
         updateSession(id, { status: 'complete', summary: result.summary }),
       ]);
-      syncSessionToSupabase(id).catch(console.warn); // non-blocking
 
       await loadAll();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Organization failed:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      const isApiKeyError = message.toLowerCase().includes('api key') || message.toLowerCase().includes('authentication') || message.toLowerCase().includes('401');
       await updateSession(id, { status: 'complete' });
       await loadAll();
+      if (isApiKeyError) {
+        Alert.alert(
+          'API Key Required',
+          'Add your Anthropic API key in Settings to organize sessions.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Could Not Organize', 'Something went wrong. You can retry by tapping "Organize with AI".', [{ text: 'OK' }]);
+      }
     } finally {
       setOrganizing(false);
     }
@@ -120,7 +134,6 @@ export default function ReviewScreen() {
 
   const handleTaskToggle = async (taskId: string, status: 'open' | 'done') => {
     await updateTaskStatus(taskId, status);
-    syncTaskUpdate(taskId, status).catch(console.warn); // non-blocking
     const updated = tasks.map(t => t.id === taskId ? { ...t, status } : t);
     setTasks(updated);
   };
@@ -296,6 +309,36 @@ export default function ReviewScreen() {
                   </View>
                 ))}
               </View>
+
+              {/* Top tasks preview */}
+              {tasks.filter(t => t.status === 'open').length > 0 && (
+                <View className="mb-4">
+                  <View className="flex-row items-center justify-between mb-2">
+                    <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide">Open Tasks</Text>
+                    {tasks.filter(t => t.status === 'open').length > 3 && (
+                      <TouchableOpacity onPress={() => setActiveTab('tasks')}>
+                        <Text className="text-navy-600 text-xs font-medium">See all →</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {tasks.filter(t => t.status === 'open').slice(0, 3).map(task => (
+                    <View key={task.id} className="bg-white rounded-xl border border-villa-border p-3 mb-2 flex-row items-start gap-3">
+                      <View className="w-5 h-5 rounded border-2 border-gray-300 mt-0.5" />
+                      <View className="flex-1">
+                        <Text className="text-gray-800 text-sm font-medium">{task.title}</Text>
+                        {task.assigned_to_name && (
+                          <Text className="text-gray-400 text-xs mt-0.5">→ {task.assigned_to_name}</Text>
+                        )}
+                      </View>
+                      <View className={`px-2 py-0.5 rounded-full ${task.priority === 'high' ? 'bg-red-50' : task.priority === 'low' ? 'bg-green-50' : 'bg-amber-50'}`}>
+                        <Text className={`text-xs font-medium ${task.priority === 'high' ? 'text-red-600' : task.priority === 'low' ? 'text-green-600' : 'text-amber-600'}`}>
+                          {task.priority}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               {/* Issues */}
               {issues.length > 0 && (

@@ -17,17 +17,17 @@ export async function organizeSession(
 
   const transcriptText = transcript
     .map(line => {
-      const speaker = line.speaker_id === 'me' ? 'Owner' : (staffMap[line.speaker_id] ?? line.speaker_id);
+      const speaker = line.speaker_id === 'me' ? 'You' : (staffMap[line.speaker_id] ?? line.speaker_id);
       const location = line.context_id ? ` [${locationMap[line.context_id] ?? line.context_id}]` : '';
       const time = new Date(line.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       return `[${time}]${location} ${speaker}: ${line.text}`;
     })
     .join('\n');
 
-  const prompt = `You are an intelligent meeting organizer for a villa property manager. Analyze this meeting transcript and extract structured information.
+  const prompt = `You are an intelligent meeting organizer. Analyze this meeting transcript and extract structured information.
 
 SESSION: "${sessionTitle}"
-PARTICIPANTS: Owner + ${staff.map(s => s.name).join(', ')}
+PARTICIPANTS: You + ${staff.map(s => s.name).join(', ')}
 
 TRANSCRIPT:
 ${transcriptText}
@@ -39,7 +39,7 @@ Return a JSON object with this exact structure:
     {
       "title": "specific actionable task",
       "assigned_to": "staff member name or null",
-      "location_id": "location id from this list: ${locations.map(l => l.id).join(', ')} or null",
+      "location_id": "context id from this list: ${locations.map(l => l.id).join(', ')} or null",
       "priority": "low|medium|high",
       "due_date_description": "when if mentioned, else null",
       "notes": "any relevant details"
@@ -49,33 +49,33 @@ Return a JSON object with this exact structure:
     {
       "text": "the idea",
       "source": "speaker name",
-      "category": "improvement|maintenance|aesthetic|operational|other"
+      "category": "improvement|process|strategic|technical|other"
     }
   ],
   "issues": [
     {
       "title": "short title",
       "description": "what was said",
-      "location_id": "location id or null",
+      "location_id": "context id or null",
       "severity": "low|medium|high"
     }
   ],
   "decisions": [
     {
       "text": "what was decided",
-      "made_by": "owner or staff name"
+      "made_by": "you or staff name"
     }
   ],
   "next_steps": ["bullet point action item"]
 }
 
 Rules:
-- Tasks are specific, actionable items (fix X, order Y, repaint Z)
-- Ideas are suggestions or proposals (could be good to..., what if we...)
-- Issues are problems noted (broken, stained, not working, needs attention)
-- Decisions are agreed-upon choices (we will, I've decided to, confirmed)
+- Tasks are specific, actionable items (assign X, schedule Y, deliver Z, follow up on W)
+- Ideas are suggestions or proposals (could be good to..., what if we..., we should consider...)
+- Issues are problems noted (broken, not working, blocked, needs attention, behind schedule)
+- Decisions are agreed-upon choices (we will, decided to, confirmed, going with)
 - Be concise but complete
-- Only include items clearly from the transcript`;
+- Only include items clearly stated in the transcript`;
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
