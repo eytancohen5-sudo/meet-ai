@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, SafeAreaView,
   ActivityIndicator, Share, Alert, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 import {
   getSession, getTranscriptLines, getTasks, getIdeas, getIssues,
   getDecisions, getMediaItems, addTask, addIdea, addIssue, addDecision,
@@ -38,13 +38,11 @@ export default function ReviewScreen() {
   const [organizing, setOrganizing] = useState(false);
 
   // Audio playback
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [playing, setPlaying] = useState(false);
+  const player = useAudioPlayer(session?.audio_uri ? { uri: session.audio_uri } : null);
   const [playingLineId, setPlayingLineId] = useState<string | null>(null);
 
   useEffect(() => {
     loadAll();
-    return () => { soundRef.current?.unloadAsync(); };
   }, [id]);
 
   const loadAll = async () => {
@@ -159,39 +157,22 @@ export default function ReviewScreen() {
     await Share.share({ message: lines, title: session.title });
   };
 
-  const playAudioFromTime = async (startTime: number) => {
-    if (!session?.audio_uri) return;
+  const handleTranscriptLinePress = async (line: TranscriptLine) => {
+    if (!session?.audio_uri || !player) return;
     try {
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: session.audio_uri },
-        { positionMillis: Math.max(0, startTime * 1000 - 500), shouldPlay: true }
-      );
-      soundRef.current = sound;
-      setPlaying(true);
-      sound.setOnPlaybackStatusUpdate(status => {
-        if (status.isLoaded && status.didJustFinish) {
-          setPlaying(false);
-          setPlayingLineId(null);
-        }
-      });
+      setPlayingLineId(line.id);
+      player.seekTo(Math.max(0, line.start_time - 0.5));
+      player.play();
+      // Clear indicator after 5 seconds
+      setTimeout(() => setPlayingLineId(null), 5000);
     } catch (err) {
       console.warn('Could not play audio:', err);
+      setPlayingLineId(null);
     }
   };
 
-  const handleTranscriptLinePress = async (line: TranscriptLine) => {
-    if (!session?.audio_uri) return;
-    setPlayingLineId(line.id);
-    await playAudioFromTime(line.start_time);
-  };
-
-  const stopPlayback = async () => {
-    await soundRef.current?.stopAsync();
-    setPlaying(false);
+  const stopPlayback = () => {
+    player?.pause();
     setPlayingLineId(null);
   };
 
@@ -422,7 +403,7 @@ export default function ReviewScreen() {
 
           {activeTab === 'transcript' && (
             <View>
-              {playing && (
+              {player?.playing && (
                 <TouchableOpacity
                   className="flex-row items-center gap-2 bg-navy-50 border border-navy-100 rounded-xl p-3 mb-3"
                   onPress={stopPlayback}
