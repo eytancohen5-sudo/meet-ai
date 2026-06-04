@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, SafeAreaView,
-  TextInput, TouchableOpacity, Alert, Switch,
+  TextInput, TouchableOpacity, Alert, Switch, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../../stores/settings';
@@ -103,6 +103,19 @@ export default function SettingsScreen() {
               Meet AI v1.0{'\n'}
               Powered by Anthropic Claude · iOS Speech Recognition{'\n'}
               Built for Expo SDK 56
+            </Text>
+            <Text className="text-gray-400 text-xs leading-relaxed mt-3">
+              Built half out of love for the craft, half because rent exists. Both are true.
+            </Text>
+            <Text className="text-gray-400 text-xs leading-relaxed mt-1">
+              Still don't get the point?{' '}
+              <Text
+                className="text-navy-700"
+                onPress={() => Linking.openURL('mailto:eytancohen5@gmail.com')}
+              >
+                Mail us
+              </Text>
+              {' '}— we'll build your thing in ten seconds. Give or take.
             </Text>
           </View>
 
