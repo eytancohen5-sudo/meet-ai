@@ -25,13 +25,23 @@
       "expo-camera",
       "expo-image-picker",
       "expo-media-library",
-      ["@jamsch/expo-speech-recognition", {
-        "microphonePermission": "Meet AI needs microphone access to record meetings.",
-        "speechRecognitionPermission": "Meet AI uses speech recognition to transcribe your meetings."
-      }]
+      [
+        "@jamsch/expo-speech-recognition",
+        {
+          "microphonePermission": "Meet AI needs microphone access to record meetings.",
+          "speechRecognitionPermission": "Meet AI uses speech recognition to transcribe your meetings."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f55061ce-b3c3-4e97-8532-2741b32f8c1e"
+      }
+    },
+    "owner": "esexpo"
   }
 }
