@@ -21,7 +21,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-av",
       "expo-camera",
       "expo-image-picker",
       "expo-media-library",
@@ -32,7 +31,8 @@
           "speechRecognitionPermission": "Meet AI uses speech recognition to transcribe your meetings."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

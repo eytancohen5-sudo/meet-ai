@@ -11,7 +11,13 @@ import { useActiveSession } from '../../stores/session';
 import {
   addTranscriptLine, addMediaItem, updateSession, getContexts, getStaff,
 } from '../../lib/database';
-import { stopRecording, pauseRecording, resumeRecording, saveAudioToDocuments, formatDuration, getRecordingElapsed } from '../../lib/transcription';
+import { saveAudioToDocuments, formatDuration, getRecordingElapsed, markRecordingStart, markPauseStart, markResumed } from '../../lib/transcription';
+import {
+  useAudioRecorder,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  RecordingPresets,
+} from 'expo-audio';
 import { TranscriptLineView } from '../../components/TranscriptLine';
 import { TranscriptLine, Context, StaffMember } from '../../types';
 import { nanoid } from '../_utils';
@@ -28,6 +34,7 @@ export default function ActiveSessionScreen() {
   const [activeSpeakerId, setActiveSpeakerId] = useState<string>('me');
   const [pendingText, setPendingText] = useState('');
   const [isStopping, setIsStopping] = useState(false);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   // Speech recognition
   const recognitionStartTime = useRef(Date.now());
 
@@ -105,6 +112,13 @@ export default function ActiveSessionScreen() {
     // Start speech recognition
     startListening();
 
+    // Start audio recording
+    setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
+      .then(() => recorder.prepareToRecordAsync())
+      .then(() => recorder.record())
+      .then(() => markRecordingStart())
+      .catch(console.error);
+
     // Elapsed timer
     elapsedRef.current = setInterval(() => {
       setElapsed(getRecordingElapsed());
@@ -117,7 +131,8 @@ export default function ActiveSessionScreen() {
 
   const handlePauseResume = async () => {
     if (session.isPaused) {
-      await resumeRecording();
+      await recorder.record();
+      markResumed();
       session.resumeSession();
       ExpoSpeechRecognitionModule.start({
         lang: 'en-US',
@@ -126,7 +141,8 @@ export default function ActiveSessionScreen() {
       });
     } else {
       ExpoSpeechRecognitionModule.stop();
-      await pauseRecording();
+      await recorder.pause();
+      markPauseStart();
       session.pauseSession();
     }
   };
@@ -146,7 +162,8 @@ export default function ActiveSessionScreen() {
             if (elapsedRef.current) clearInterval(elapsedRef.current);
 
             try {
-              const uri = await stopRecording();
+              await recorder.stop();
+              const uri = recorder.uri ?? null;
               const savedUri = uri ? await saveAudioToDocuments(uri, id) : undefined;
               await updateSession(id, {
                 ended_at: Date.now(),

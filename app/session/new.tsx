@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import { getContexts, getStaff, createSession, addParticipant } from '../../lib/database';
 import { Context, StaffMember } from '../../types';
 import { useActiveSession } from '../../stores/session';
-import { startRecording, requestAudioPermissions } from '../../lib/transcription';
+import { requestRecordingPermissionsAsync } from 'expo-audio';
 import { nanoid } from '../_utils';
 
 export default function NewSessionScreen() {
@@ -42,8 +42,8 @@ export default function NewSessionScreen() {
     if (starting) return;
     setStarting(true);
 
-    const hasPermission = await requestAudioPermissions();
-    if (!hasPermission) {
+    const { granted } = await requestRecordingPermissionsAsync();
+    if (!granted) {
       Alert.alert('Microphone Required', 'Please allow microphone access to record sessions.');
       setStarting(false);
       return;
@@ -65,7 +65,8 @@ export default function NewSessionScreen() {
         await addParticipant(sessionId, staffId);
       }
 
-      await startRecording();
+      // Recording is now started by the session screen's useAudioRecorder hook
+      // Permissions are requested here before navigating
 
       startSession(
         sessionId,
