@@ -1,11 +1,11 @@
-# CLAUDE.md — Villa Assistant
+# CLAUDE.md — Meet AI
 Source of truth for all agents and the main Claude Code session.
 
 > **STOP. Before doing ANYTHING else — reading a file, running grep, touching code — invoke @champ via the Agent tool. This is mandatory for every session, every request, no matter how small it appears. There are no exceptions.**
 
 ## 1. Project identity
-- **Project:** Villa Assistant — iOS mobile app for villa property managers to record, transcribe, and AI-organize staff meetings
-- **Operator:** Boss (Eytan)
+- **Project:** Meet AI — iOS mobile app for villa property managers to record, transcribe, and AI-organize staff meetings
+- **Operator:** Eytan
 - **Mission:** Help villa property managers capture actionable tasks, decisions, and insights from staff walkthroughs using voice recording + Claude AI
 - **Apps in scope:**
   - `.` — The full React Native / Expo app
@@ -54,7 +54,7 @@ VillaAssistant/
 | iOS mic/speech | `lib/transcription.ts` + expo-speech-recognition | Real-time transcript lines |
 | iOS camera/photos | expo-camera + expo-image-picker | Media attached to sessions |
 
-Note: `@supabase/supabase-js` is in `package.json` but **not yet integrated**. Do not use without Boss's explicit approval.
+Note: `@supabase/supabase-js` is in `package.json` but **not yet integrated**. Do not use without Eytan's explicit approval.
 
 ## 4. Workstreams
 
@@ -159,7 +159,7 @@ Score every non-trivial request on five axes (Intent, Scope, Constraints, Succes
 **Operational fragilities:**
 - API key missing → "Organize" silently fails; always check settings on first launch
 - SQLite migration failure → app crash on cold start; test on fresh simulator before shipping
-- `@supabase/supabase-js` in deps but NOT integrated — do not wire up without Boss's approval
+- `@supabase/supabase-js` in deps but NOT integrated — do not wire up without Eytan's approval
 
 ## 10. Glossary
 | Term | Definition |

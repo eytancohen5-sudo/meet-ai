@@ -1,6 +1,6 @@
 # /record — New Meeting Session Workflow
 
-The primary Villa Assistant workflow: start a meeting session, record it, and process the transcript into structured outputs.
+The primary Meet AI workflow: start a meeting session, record it, and process the transcript into structured outputs.
 
 ## Steps
 
@@ -36,6 +36,6 @@ The primary Villa Assistant workflow: start a meeting session, record it, and pr
 
 ## Hard stops — do NOT proceed if:
 - No Anthropic API key set (sentinel has flagged this)
-- Microphone permission denied — guide Boss to iOS Settings to grant
-- Claude API returns a parse error — do not silently discard; show the raw error to Boss
+- Microphone permission denied — guide Eytan to iOS Settings to grant
+- Claude API returns a parse error — do not silently discard; show the raw error to Eytan
 - Session has zero transcript lines — do not trigger organize

@@ -362,4 +362,4 @@ The `user_version` variable is read once at line 16 before any migration runs. B
 3. **The `try/catch` blocks must swallow silently.** The pattern matches the existing v2 block. A "duplicate column name" error on re-run is expected and harmless.
 4. **Update the import on line 2** of `database.ts`: `Location` → `Context`, remove `DEFAULT_LOCATIONS` import from line 3 — these are TypeScript-layer changes that must land in the same commit as the migration.
 5. **`upsertContext`** must add `context_type` to the INSERT column list: `INSERT OR REPLACE INTO contexts (id, name, icon, color, reference_image_uri, ai_description, context_type) VALUES (?, ?, ?, ?, ?, ?, ?)`.
-6. **Test on fresh simulator** (delete `villa_assistant.db` from simulator container) AND on a simulated upgrade (backup a v2 database, restore, relaunch) before marking implementation complete.
+6. **Test on fresh simulator** (delete `meet_ai.db` from simulator container) AND on a simulated upgrade (backup a v2 database, restore, relaunch) before marking implementation complete.

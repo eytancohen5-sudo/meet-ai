@@ -5,7 +5,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!db) {
-    db = await SQLite.openDatabaseAsync('villa_assistant.db');
+    db = await SQLite.openDatabaseAsync('meet_ai.db');
     await migrate(db);
   }
   return db;

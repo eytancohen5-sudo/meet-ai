@@ -3,20 +3,20 @@
     "name": "Meet AI",
     "slug": "meet-ai",
     "version": "1.0.0",
-    "scheme": "villaassistant",
+    "scheme": "meetai",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.villa.assistant",
+      "bundleIdentifier": "com.meetai.app",
       "infoPlist": {
-        "NSSpeechRecognitionUsageDescription": "Villa Assistant uses speech recognition to transcribe your meetings.",
-        "NSMicrophoneUsageDescription": "Villa Assistant needs microphone access to record meetings.",
-        "NSCameraUsageDescription": "Villa Assistant uses the camera to document issues and tasks.",
-        "NSPhotoLibraryUsageDescription": "Villa Assistant saves photos from your meetings.",
-        "NSLocationWhenInUseUsageDescription": "Villa Assistant can use location to help tag meeting context."
+        "NSSpeechRecognitionUsageDescription": "Meet AI uses speech recognition to transcribe your meetings.",
+        "NSMicrophoneUsageDescription": "Meet AI needs microphone access to record meetings.",
+        "NSCameraUsageDescription": "Meet AI uses the camera to document issues and tasks.",
+        "NSPhotoLibraryUsageDescription": "Meet AI saves photos from your meetings.",
+        "NSLocationWhenInUseUsageDescription": "Meet AI can use location to help tag meeting context."
       }
     },
     "plugins": [
@@ -26,8 +26,8 @@
       "expo-image-picker",
       "expo-media-library",
       ["@jamsch/expo-speech-recognition", {
-        "microphonePermission": "Villa Assistant needs microphone access to record meetings.",
-        "speechRecognitionPermission": "Villa Assistant uses speech recognition to transcribe your meetings."
+        "microphonePermission": "Meet AI needs microphone access to record meetings.",
+        "speechRecognitionPermission": "Meet AI uses speech recognition to transcribe your meetings."
       }]
     ],
     "experiments": {
