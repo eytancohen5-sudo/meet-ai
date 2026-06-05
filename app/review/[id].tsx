@@ -231,7 +231,7 @@ export default function ReviewScreen() {
         </View>
       )}
 
-      <View className="flex-1 bg-villa-bg rounded-t-3xl">
+      <View className="flex-1 bg-app-bg rounded-t-3xl">
         {/* Tab Bar */}
         <ScrollView
           horizontal
@@ -267,7 +267,7 @@ export default function ReviewScreen() {
             <View>
               {/* Summary */}
               {session.summary ? (
-                <View className="bg-white rounded-2xl border border-villa-border p-4 mb-4">
+                <View className="bg-white rounded-2xl border border-app-border p-4 mb-4">
                   <View className="flex-row items-center gap-2 mb-2">
                     <Ionicons name="sparkles-outline" size={16} color="#C9A84C" />
                     <Text className="text-navy-800 font-semibold text-sm">AI Summary</Text>
@@ -283,7 +283,7 @@ export default function ReviewScreen() {
                   { label: 'Ideas', count: ideas.length, color: '#C9A84C', icon: 'bulb-outline' },
                   { label: 'Issues', count: issues.length, color: '#ef4444', icon: 'warning-outline' },
                 ].map(stat => (
-                  <View key={stat.label} className="flex-1 bg-white rounded-2xl border border-villa-border p-3 items-center">
+                  <View key={stat.label} className="flex-1 bg-white rounded-2xl border border-app-border p-3 items-center">
                     <Ionicons name={stat.icon as any} size={20} color={stat.color} />
                     <Text className="text-2xl font-bold text-navy-800 mt-1">{stat.count}</Text>
                     <Text className="text-gray-400 text-xs">{stat.label}</Text>
@@ -303,7 +303,7 @@ export default function ReviewScreen() {
                     )}
                   </View>
                   {tasks.filter(t => t.status === 'open').slice(0, 3).map(task => (
-                    <View key={task.id} className="bg-white rounded-xl border border-villa-border p-3 mb-2 flex-row items-start gap-3">
+                    <View key={task.id} className="bg-white rounded-xl border border-app-border p-3 mb-2 flex-row items-start gap-3">
                       <View className="w-5 h-5 rounded border-2 border-gray-300 mt-0.5" />
                       <View className="flex-1">
                         <Text className="text-gray-800 text-sm font-medium">{task.title}</Text>
@@ -326,7 +326,7 @@ export default function ReviewScreen() {
                 <View className="mb-4">
                   <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Issues</Text>
                   {issues.map(issue => (
-                    <View key={issue.id} className="bg-white rounded-xl border border-villa-border p-3 mb-2">
+                    <View key={issue.id} className="bg-white rounded-xl border border-app-border p-3 mb-2">
                       <View className="flex-row items-center gap-2">
                         <View className="w-2 h-2 rounded-full" style={{ backgroundColor: SEVERITY_COLOR[issue.severity] }} />
                         <Text className="text-gray-800 font-medium text-sm flex-1">{issue.title}</Text>

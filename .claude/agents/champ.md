@@ -126,10 +126,10 @@ Never ask a question whose answer you could get in under a minute of self-invest
 
 ## Project context
 
-- Users: Villa owner/property manager (Eytan) on iOS
+- Users: Meeting organizer (Eytan) on iOS
 - Stack: React Native 0.85.3 + Expo 56 + expo-router + NativeWind v4 + Tailwind v3 + expo-sqlite + Anthropic Claude API + Zustand
 - Test runner: `npm test` (Jest via jest-expo preset)
-- Every code change ends with commit + push to git@github.com:eytancohen5-sudo/villa-assistant.git; always git fetch && pull --rebase before push
+- Every code change ends with commit + push to git@github.com:eytancohen5-sudo/meet-ai.git; always git fetch && pull --rebase before push
 - CRITICAL: Always read Expo v56 docs at https://docs.expo.dev/versions/v56.0.0/ before writing any Expo code
 - NativeWind v4: use className prop — never StyleSheet.create for styled components
 - Tailwind v3 only — check tailwind.config.js for configured values

@@ -4,7 +4,7 @@ Source of truth for all agents and the main Claude Code session.
 > **STOP. Before doing ANYTHING else — reading a file, running grep, touching code — invoke @champ via the Agent tool. This is mandatory for every session, every request, no matter how small it appears. There are no exceptions.**
 
 ## 1. Project identity
-- **Project:** Meet AI — iOS mobile app for villa property managers to record, transcribe, and AI-organize staff meetings
+- **Project:** Meet AI — iOS mobile app for managers and teams to record, transcribe, and AI-organize meetings
 - **Operator:** Eytan
 - **Mission:** Help managers and team leads capture actionable tasks, decisions, and insights from meetings and walkthroughs using voice recording + Claude AI
 - **Apps in scope:**

@@ -20,7 +20,7 @@ export function TaskCard({ task, onToggle, compact = false }: Props) {
   const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
 
   return (
-    <View className={`bg-white rounded-xl border border-villa-border ${compact ? 'p-3' : 'p-4'} mb-2`}>
+    <View className={`bg-white rounded-xl border border-app-border ${compact ? 'p-3' : 'p-4'} mb-2`}>
       <View className="flex-row items-start gap-3">
         <TouchableOpacity
           onPress={() => onToggle?.(task.id, isDone ? 'open' : 'done')}

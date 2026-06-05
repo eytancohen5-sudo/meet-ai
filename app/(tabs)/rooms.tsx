@@ -124,7 +124,7 @@ export default function RoomsScreen() {
         <Text className="text-navy-400 text-sm mt-1">Contexts and people.</Text>
       </View>
 
-      <View className="flex-1 bg-villa-bg rounded-t-3xl">
+      <View className="flex-1 bg-app-bg rounded-t-3xl">
         {/* Tabs */}
         <View className="flex-row mx-4 mt-4 bg-gray-100 rounded-xl p-1">
           {(['rooms', 'staff'] as const).map(t => (
@@ -147,7 +147,7 @@ export default function RoomsScreen() {
           {tab === 'rooms' ? (
             <>
               {contexts.map(ctx => (
-                <View key={ctx.id} className="bg-white rounded-2xl border border-villa-border mb-3 overflow-hidden">
+                <View key={ctx.id} className="bg-white rounded-2xl border border-app-border mb-3 overflow-hidden">
                   {/* Context photo or placeholder */}
                   {ctx.reference_image_uri ? (
                     <Image
@@ -199,7 +199,7 @@ export default function RoomsScreen() {
           ) : (
             <>
               {staff.map(member => (
-                <View key={member.id} className="bg-white rounded-xl border border-villa-border p-4 mb-2 flex-row items-center">
+                <View key={member.id} className="bg-white rounded-xl border border-app-border p-4 mb-2 flex-row items-center">
                   <View className="w-11 h-11 rounded-full items-center justify-center mr-3" style={{ backgroundColor: member.color + '30' }}>
                     <Text className="font-bold text-sm" style={{ color: member.color }}>{member.avatar_initials}</Text>
                   </View>

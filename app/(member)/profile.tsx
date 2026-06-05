@@ -27,7 +27,7 @@ export default function MemberProfile() {
         <Text className="text-white text-2xl font-bold tracking-tight">My Profile</Text>
       </View>
 
-      <View className="flex-1 bg-villa-bg rounded-t-3xl px-5 pt-6">
+      <View className="flex-1 bg-app-bg rounded-t-3xl px-5 pt-6">
         {/* Avatar */}
         <View className="items-center mb-6">
           <View className="w-20 h-20 rounded-full bg-navy-100 items-center justify-center mb-3">
@@ -44,8 +44,8 @@ export default function MemberProfile() {
         </View>
 
         {/* Profile card */}
-        <View className="bg-white rounded-2xl border border-villa-border p-5 mb-4">
-          <View className="flex-row items-center gap-3 py-3 border-b border-villa-border">
+        <View className="bg-white rounded-2xl border border-app-border p-5 mb-4">
+          <View className="flex-row items-center gap-3 py-3 border-b border-app-border">
             <Ionicons name="mail-outline" size={18} color="#6e8fac" />
             <View className="flex-1">
               <Text className="text-gray-400 text-xs">Email</Text>

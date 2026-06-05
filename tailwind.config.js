@@ -22,7 +22,7 @@ module.exports = {
           500: '#c9a84c',
           600: '#b8943a',
         },
-        villa: {
+        app: {
           bg: '#f8f6f0',
           card: '#ffffff',
           border: '#e8e4dc',

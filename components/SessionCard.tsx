@@ -30,7 +30,7 @@ export function SessionCard({ session, onPress, onLongPress }: Props) {
     <TouchableOpacity
       onPress={onPress}
       onLongPress={onLongPress}
-      className="bg-white rounded-2xl p-4 mb-3 shadow-sm border border-villa-border"
+      className="bg-white rounded-2xl p-4 mb-3 shadow-sm border border-app-border"
       activeOpacity={0.7}
     >
       <View className="flex-row items-start justify-between mb-2">
@@ -76,7 +76,7 @@ export function SessionCard({ session, onPress, onLongPress }: Props) {
       )}
 
       {session.status === 'complete' && (
-        <View className="flex-row gap-3 mt-3 pt-3 border-t border-villa-border">
+        <View className="flex-row gap-3 mt-3 pt-3 border-t border-app-border">
           {(session.task_count ?? 0) > 0 && (
             <View className="flex-row items-center gap-1">
               <Ionicons name="checkbox-outline" size={13} color="#E06C1A" />

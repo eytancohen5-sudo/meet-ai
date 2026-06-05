@@ -255,7 +255,7 @@ export default function ActiveSessionScreen() {
       </View>
 
       {/* Transcript Area */}
-      <View className="flex-1 bg-villa-bg">
+      <View className="flex-1 bg-app-bg">
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
@@ -296,7 +296,7 @@ export default function ActiveSessionScreen() {
         </ScrollView>
 
         {/* Bottom Controls */}
-        <View className="bg-white border-t border-villa-border px-4 pt-3 pb-8">
+        <View className="bg-white border-t border-app-border px-4 pt-3 pb-8">
           {/* Speaker chips — tap to switch, no modal */}
           {session.participantIds.length > 0 && (
             <ScrollView

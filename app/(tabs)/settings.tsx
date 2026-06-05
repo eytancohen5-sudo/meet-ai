@@ -29,14 +29,14 @@ export default function SettingsScreen() {
         <Text className="text-navy-400 text-sm mt-1">A few things to set up.</Text>
       </View>
 
-      <View className="flex-1 bg-villa-bg rounded-t-3xl">
+      <View className="flex-1 bg-app-bg rounded-t-3xl">
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
         >
           {/* Profile Section */}
           <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-3 mt-2">Profile</Text>
-          <View className="bg-white rounded-2xl border border-villa-border p-4 mb-4">
+          <View className="bg-white rounded-2xl border border-app-border p-4 mb-4">
             <Text className="text-gray-500 text-xs mb-1">Your Name</Text>
             <TextInput
               className="text-navy-800 text-base font-medium"
@@ -49,7 +49,7 @@ export default function SettingsScreen() {
 
           {/* AI Section */}
           <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-3">AI</Text>
-          <View className="bg-white rounded-2xl border border-villa-border p-4 mb-2">
+          <View className="bg-white rounded-2xl border border-app-border p-4 mb-2">
             <Text className="text-gray-800 font-medium mb-1">Anthropic API Key</Text>
             <Text className="text-gray-400 text-xs mb-3">
               Needed for the organizing step. Get one at console.anthropic.com
@@ -79,7 +79,7 @@ export default function SettingsScreen() {
 
           {/* Speech Recognition Section */}
           <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-3">Transcription</Text>
-          <View className="bg-white rounded-2xl border border-villa-border divide-y divide-gray-100 mb-6">
+          <View className="bg-white rounded-2xl border border-app-border divide-y divide-gray-100 mb-6">
             <View className="p-4 flex-row items-center justify-between">
               <View className="flex-1 mr-3">
                 <Text className="text-gray-800 font-medium text-sm">Offline Mode</Text>
@@ -98,7 +98,7 @@ export default function SettingsScreen() {
 
           {/* About */}
           <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-3">About</Text>
-          <View className="bg-white rounded-2xl border border-villa-border p-4 mb-4">
+          <View className="bg-white rounded-2xl border border-app-border p-4 mb-4">
             <Text className="text-gray-400 text-xs leading-relaxed">
               Meet AI v1.0{'\n'}
               Powered by Anthropic Claude · iOS Speech Recognition{'\n'}

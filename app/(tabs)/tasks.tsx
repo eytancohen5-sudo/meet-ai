@@ -44,7 +44,7 @@ export default function TasksScreen() {
         </Text>
       </View>
 
-      <View className="flex-1 bg-villa-bg rounded-t-3xl">
+      <View className="flex-1 bg-app-bg rounded-t-3xl">
         <ScrollView
           contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 16, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1E3A5F" />}

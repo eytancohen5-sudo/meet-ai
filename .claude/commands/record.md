@@ -6,11 +6,11 @@ The primary Meet AI workflow: start a meeting session, record it, and process th
 
 ### 1. Configure the session
 - Confirm participants: which staff members will be present? (drawn from `staff` table)
-- Confirm starting location: which villa area? (drawn from `locations` table; QR scan optional)
+- Confirm starting context: which area or topic? (drawn from `contexts` table)
 - Confirm session title or use auto-generated default
 
 ### 2. Start recording
-- villa reviews: does the participant list match the expected roles for this meeting type?
+- Review: does the participant list match the expected roles for this meeting type?
 - canvas reviews: is the recording UI correctly showing status (recording, paused, elapsed time)?
 - Tap Record → confirm microphone permission is active → confirm transcript lines begin appearing
 

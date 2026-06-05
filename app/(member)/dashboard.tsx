@@ -83,7 +83,7 @@ export default function MemberDashboard() {
         <Text className="text-navy-400 text-sm mt-1">Your open tasks and sessions</Text>
       </View>
 
-      <View className="flex-1 bg-villa-bg rounded-t-3xl">
+      <View className="flex-1 bg-app-bg rounded-t-3xl">
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
           showsVerticalScrollIndicator={false}
@@ -103,7 +103,7 @@ export default function MemberDashboard() {
           </Text>
 
           {tasks.length === 0 ? (
-            <View className="bg-white rounded-2xl border border-villa-border p-6 items-center mb-6">
+            <View className="bg-white rounded-2xl border border-app-border p-6 items-center mb-6">
               <Ionicons name="checkmark-circle-outline" size={36} color="#D9E2EC" />
               <Text className="text-gray-400 text-sm mt-3 text-center">No open tasks assigned to you</Text>
             </View>
@@ -121,13 +121,13 @@ export default function MemberDashboard() {
           </Text>
 
           {sessions.length === 0 ? (
-            <View className="bg-white rounded-2xl border border-villa-border p-6 items-center">
+            <View className="bg-white rounded-2xl border border-app-border p-6 items-center">
               <Ionicons name="mic-outline" size={36} color="#D9E2EC" />
               <Text className="text-gray-400 text-sm mt-3 text-center">No sessions recorded yet</Text>
             </View>
           ) : (
             sessions.map(session => (
-              <View key={session.id} className="bg-white rounded-xl border border-villa-border p-4 mb-2">
+              <View key={session.id} className="bg-white rounded-xl border border-app-border p-4 mb-2">
                 <Text className="text-navy-800 font-medium" numberOfLines={1}>{session.title}</Text>
                 <View className="flex-row items-center gap-3 mt-1">
                   <Text className="text-gray-400 text-xs">
