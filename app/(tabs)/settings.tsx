@@ -9,6 +9,7 @@ import { router, useFocusEffect } from 'expo-router';
 import Anthropic from '@anthropic-ai/sdk';
 import { useSettings } from '../../stores/settings';
 import { getContexts } from '../../lib/database';
+import { TAB_SCREEN_EDGES } from '../../lib/ui';
 
 type KeyTestState = 'idle' | 'testing' | 'pass' | 'rejected' | 'unreachable';
 
@@ -101,7 +102,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-bg">
+    <SafeAreaView edges={TAB_SCREEN_EDGES} className="flex-1 bg-bg">
       <View className="px-5 pt-4 pb-5">
         <Text className="text-text-primary text-2xl font-bold tracking-tight">Settings</Text>
         <Text className="text-text-secondary text-sm mt-1">A few things to set up.</Text>

@@ -15,6 +15,7 @@ import {
   getAllTasks, updateTaskStatus, updateTask, deleteTask, addTask,
   getAllOpenIssues, updateIssueStatus, getStaff,
 } from '../../lib/database';
+import { TAB_SCREEN_EDGES } from '../../lib/ui';
 import { useSettings } from '../../stores/settings';
 import { Task, Issue, StaffMember } from '../../types';
 
@@ -331,7 +332,7 @@ export default function TasksScreen() {
   ];
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-bg">
+    <SafeAreaView edges={TAB_SCREEN_EDGES} className="flex-1 bg-bg">
       <View className="px-5 pt-4 pb-3">
         <Text className="text-text-primary text-2xl font-bold tracking-tight">Tasks</Text>
         <Text className="text-text-secondary text-sm mt-1">

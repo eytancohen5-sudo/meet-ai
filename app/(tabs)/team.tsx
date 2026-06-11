@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, router } from 'expo-router';
 import { getStaff, upsertStaff, deleteStaff, getAllOpenTasks } from '../../lib/database';
+import { TAB_SCREEN_EDGES } from '../../lib/ui';
 import { StaffMember, SPEAKER_COLORS } from '../../types';
 import { nanoid } from '../_utils';
 import { PersonCard } from '../../components/PersonCard';
@@ -121,7 +122,7 @@ export default function TeamScreen() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-bg">
+    <SafeAreaView edges={TAB_SCREEN_EDGES} className="flex-1 bg-bg">
       <View className="px-5 pt-4 pb-2">
         <Text className="text-text-primary text-2xl font-bold tracking-tight">Team</Text>
         <Text className="text-text-secondary text-sm mt-1">The people in your meetings.</Text>

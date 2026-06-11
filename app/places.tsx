@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { getContexts, upsertContext, deleteContext } from '../lib/database';
+import { TAB_SCREEN_EDGES } from '../lib/ui';
 import { Context } from '../types';
 import { nanoid } from './_utils';
 import { EmptyState } from '../components/EmptyState';
@@ -85,7 +86,7 @@ export default function PlacesScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-bg">
+    <SafeAreaView edges={TAB_SCREEN_EDGES} className="flex-1 bg-bg">
       {/* Header */}
       <View className="px-5 pt-4 pb-5 flex-row items-center">
         <TouchableOpacity

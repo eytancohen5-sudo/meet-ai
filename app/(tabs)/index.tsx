@@ -15,6 +15,7 @@ import {
   getSessions, deleteSession, markInterruptedSessions,
   getStaff, getSetting, setSetting,
 } from '../../lib/database';
+import { TAB_SCREEN_EDGES } from '../../lib/ui';
 import { useActiveSession } from '../../stores/session';
 import { useSettings } from '../../stores/settings';
 import { Session } from '../../types';
@@ -193,7 +194,7 @@ export default function SessionsScreen() {
   const pastSessions = sessions.filter(s => s.id !== liveSession?.id);
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-bg">
+    <SafeAreaView edges={TAB_SCREEN_EDGES} className="flex-1 bg-bg">
       {/* Header */}
       <View className="px-5 pt-4 pb-5">
         <Text className="text-text-primary text-2xl font-bold tracking-tight">Meet AI</Text>
