@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Alert, SafeAreaView, TextInput, Modal,
+  Alert, TextInput, Modal,
   Image, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { getContexts, upsertContext, deleteContext, getStaff, upsertStaff, deleteStaff } from '../../lib/database';
@@ -22,7 +23,7 @@ const CONTEXT_TYPES: { type: ContextType; label: string; icon: string }[] = [
 export default function RoomsScreen() {
   if (Platform.OS === 'web') {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center p-8">
+      <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-white items-center justify-center p-8">
         <Ionicons name="phone-portrait-outline" size={48} color="#E5E7EB" />
         <Text className="text-text-primary font-semibold text-lg mt-4">Mobile app required</Text>
         <Text className="text-text-secondary text-sm mt-2 text-center">
@@ -118,7 +119,7 @@ export default function RoomsScreen() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView className="flex-1 bg-bg">
+    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-bg">
       <View className="px-5 pt-4 pb-5">
         <Text className="text-text-primary text-2xl font-bold tracking-tight">Spaces</Text>
         <Text className="text-text-secondary text-sm mt-1">Contexts and people.</Text>

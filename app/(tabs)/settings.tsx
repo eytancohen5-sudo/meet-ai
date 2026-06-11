@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, SafeAreaView,
+  View, Text, ScrollView,
   TextInput, TouchableOpacity, Alert, Switch, Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../../stores/settings';
 
@@ -38,7 +39,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-bg">
+    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-bg">
       <View className="px-5 pt-4 pb-5">
         <Text className="text-text-primary text-2xl font-bold tracking-tight">Settings</Text>
         <Text className="text-text-secondary text-sm mt-1">A few things to set up.</Text>

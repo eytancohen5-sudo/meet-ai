@@ -134,7 +134,7 @@ Never ask a question whose answer you could get in under a minute of self-invest
 - NativeWind v4: use className prop — never StyleSheet.create for styled components
 - Tailwind v3 only — check tailwind.config.js for configured values
 - iOS-only app — no Android testing required
-- Local SQLite only — @supabase/supabase-js is in deps but not yet integrated; do not add Supabase without Eytan's explicit approval
+- Local SQLite only — @supabase/supabase-js is in deps; the Supabase layer (auth/sync/invites) is built but shelved — do not activate without explicit decision
 - Anthropic API key lives in stores/settings.ts — never hardcode it
 
 **The principle you embody**: "The advantage comes from structure, not the tool." Build the structure.

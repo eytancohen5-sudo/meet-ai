@@ -15,7 +15,7 @@ Read the exact versioned Expo docs at https://docs.expo.dev/versions/v56.0.0/ fo
 - NativeWind v4: use `className` prop — NEVER `StyleSheet.create` for styled components
 - Tailwind v3 only — check `tailwind.config.js` for configured values before using any class
 - iOS-only — do not add Android-specific code paths
-- Local SQLite only — `@supabase/supabase-js` is in deps but not integrated; never use it without Eytan's approval
+- Local SQLite only — `@supabase/supabase-js` is in deps; built but shelved; do not activate without explicit decision
 - Anthropic API key lives in `stores/settings.ts` via `useSettings().anthropicApiKey` — never hardcode
 - All new DB operations go through `lib/database.ts` — never raw SQLite calls from UI components
 - No `as any` or type assertion shortcuts

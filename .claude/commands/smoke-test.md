@@ -4,7 +4,7 @@ Sentinel's priority-ordered test suite. Run before and after every deploy.
 Run `npm test` first, then perform manual checks on the iOS simulator.
 
 ## Priority 1 — Recording session (must PASS before any deploy)
-- Open app → tap "New Session" → select participants + location → tap Record
+- Open app → tap "New Session" → select participants + context → tap Record
 - Speak a few words → confirm transcript lines appear in real time
 - Stop recording → confirm session saved to SQLite (check session list)
 

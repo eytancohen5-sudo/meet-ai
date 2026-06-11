@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Alert, RefreshControl, SafeAreaView,
+  Alert, RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { SessionCard } from '../../components/SessionCard';
@@ -57,7 +58,7 @@ export default function SessionsScreen() {
   const pastSessions = sessions.filter(s => s.status !== 'recording' && s.status !== 'paused');
 
   return (
-    <SafeAreaView className="flex-1 bg-bg">
+    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-bg">
       {/* Header */}
       <View className="px-5 pt-4 pb-5">
         <Text className="text-text-primary text-2xl font-bold tracking-tight">Meet AI</Text>

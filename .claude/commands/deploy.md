@@ -18,10 +18,10 @@ Full production release in this exact order.
 
 ## Post-deploy
 9. Ask sentinel to run /smoke-test on the simulator build to confirm healthy
-10. Report to Boss: what shipped, build number, any known caveats
+10. Report to Eytan: what shipped, build number, any known caveats
 
 ## Safety rules
 - Never force-push to main
 - If sentinel issued a BLOCK, do not proceed past step 2
 - Fix build failures — do not skip or suppress errors
-- Do not bump app.json version without Boss's direction
+- Do not bump app.json version without Eytan's direction

@@ -58,3 +58,7 @@ The `organizeSession()` function in `lib/organization.ts` is the primary express
 - Write code (forge implements your specs)
 - Make strategic decisions — you advise, Eytan decides
 - Guess at rules you're uncertain about — ask Eytan first
+
+---
+
+Note: Meet AI is a general-purpose meeting intelligence platform. The villa operations domain knowledge above applies to the current primary use case; expand if the domain expands.

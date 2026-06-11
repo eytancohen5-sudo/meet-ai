@@ -49,12 +49,12 @@ VillaAssistant/
 
 | Source | Access via | What it gives us |
 |---|---|---|
-| Local SQLite | `lib/database.ts` → expo-sqlite | Sessions, transcripts, tasks, ideas, issues, decisions, staff, locations |
+| Local SQLite | `lib/database.ts` → expo-sqlite | Sessions, transcripts, tasks, ideas, issues, decisions, staff, contexts |
 | Anthropic Claude API | `lib/organization.ts` | AI extraction of tasks/ideas/issues/decisions from transcripts |
 | iOS mic/speech | `lib/transcription.ts` + expo-speech-recognition | Real-time transcript lines |
 | iOS camera/photos | expo-camera + expo-image-picker | Media attached to sessions |
 
-Note: `@supabase/supabase-js` is in `package.json` but **not yet integrated**. Do not use without Eytan's explicit approval.
+Note: `@supabase/supabase-js` is in deps; the Supabase layer (auth/sync/invites) is built but shelved — do not activate without explicit decision.
 
 ## 4. Workstreams
 
@@ -124,7 +124,12 @@ End the message with: *"Ready to deploy — want me to push this live?"* when a 
 champ triggers scribe when a decision is architecture-level. ADR written before implementation.
 
 ### Parallel sessions discipline
-Always `git fetch && git pull --rebase origin main` before any commit or push. Never force-push.
+Multiple sessions may be active on this repo simultaneously.
+- Always `git fetch && git pull --rebase origin main` before any commit or push.
+- Never force-push.
+- Stage files by explicit name only — never `git add -A` or `git add .` (prevents silently including parallel-session work).
+- Immediately before `git add`, re-read the file to confirm your expected changes are still present — a parallel session can overwrite the working tree between your Write and your commit.
+- Before writing to a file you haven't touched this session, run `git status`. Any `M` or `??` entries you didn't create may be parallel-session work — surface them before overwriting.
 
 ### Comprehension threshold — ask vs. proceed
 Score every non-trivial request on five axes (Intent, Scope, Constraints, Success criterion, Risk) — each 0–2, max 10. Run one Read/Grep/Glob pass before marking any axis below 2. Threshold: 9–10 → proceed silently; 7–8 → proceed and state 1–2 assumptions; 5–6 → ask one question; 0–4 → stop, ask at most two questions. See champ agent for the full rubric.
@@ -176,4 +181,4 @@ Score every non-trivial request on five axes (Intent, Scope, Constraints, Succes
 | **ADR** | Architecture Decision Record |
 | **organize** | The AI step: sending a transcript to Claude and extracting tasks/ideas/issues/decisions |
 | **session** | A recorded meeting or walkthrough |
-| **transcript line** | One utterance from one speaker at one timestamp, optionally tagged to a location |
+| **transcript line** | One utterance from one speaker at one timestamp, optionally tagged to a context |

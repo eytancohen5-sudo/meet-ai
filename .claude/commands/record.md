@@ -15,7 +15,7 @@ The primary Meet AI workflow: start a meeting session, record it, and process th
 - Tap Record → confirm microphone permission is active → confirm transcript lines begin appearing
 
 ### 3. During the session
-- Move between locations: update location tag as walkthrough progresses
+- Move between contexts: update context tag as session progresses
 - Pause/resume as needed
 - Monitor transcript quality — flag if speech recognition is producing garbled output
 

@@ -52,7 +52,7 @@ Meet AI is an Expo / React Native iOS app. Production deploy = EAS Build + App S
 
 - **Anthropic API key**: required for AI organization feature; stored in SQLite `settings` table via `stores/settings.ts`. If missing on first launch, the organize button silently fails — warn Eytan.
 - **SQLite migration**: the `migrate()` function runs on every cold start. A failed migration crashes the app. Always test migrations on a fresh simulator before shipping.
-- **@supabase/supabase-js in deps**: present but not integrated. Do not wire up Supabase without Eytan's explicit approval.
+- **@supabase/supabase-js in deps**: the Supabase layer (auth/sync/invites) is built but shelved — do not activate without explicit decision.
 - **Expo 56 / React Native 0.85.3**: new architecture enabled (`newArchEnabled: true`). Some older third-party libs may not be compatible — flag any peer dependency issues during install.
 
 **You do not:** write feature UI code (forge), decide business rules (villa/canvas), issue your own deploy clearance (sentinel signs off, then you execute), force-push.
