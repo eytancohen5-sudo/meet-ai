@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, SafeAreaView,
-  ActivityIndicator, Share, Alert, Animated,
+  ActivityIndicator, Share, Alert, Animated, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -25,7 +25,7 @@ const SEVERITY_COLOR = { low: '#22c55e', medium: '#f59e0b', high: '#ef4444' };
 
 export default function ReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { anthropicApiKey } = useSettings();
+  const { anthropicApiKey, isLoaded: settingsLoaded } = useSettings();
 
   const [session, setSession] = useState<Session | null>(null);
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
@@ -36,6 +36,11 @@ export default function ReviewScreen() {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('summary');
   const [organizing, setOrganizing] = useState(false);
+  const [organizeError, setOrganizeError] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadError, setLoadError] = useState('');
+  // Auto-organize fires at most once per mount; manual taps bypass this guard.
+  const autoOrganizeAttempted = useRef(false);
 
   // Audio playback
   const player = useAudioPlayer(session?.audio_uri ? { uri: session.audio_uri } : null);
@@ -45,27 +50,51 @@ export default function ReviewScreen() {
     loadAll();
   }, [id]);
 
-  const loadAll = async () => {
-    const [sess, lines, t, i, iss, d, m] = await Promise.all([
-      getSession(id),
-      getTranscriptLines(id),
-      getTasks(id),
-      getIdeas(id),
-      getIssues(id),
-      getDecisions(id),
-      getMediaItems(id),
-    ]);
-    setSession(sess);
-    setTranscript(lines);
-    setTasks(t);
-    setIdeas(i);
-    setIssues(iss);
-    setDecisions(d);
-    setMedia(m);
+  // Auto-organize only after settings have loaded — never on the cold-start race
+  // (a missing-key verdict before isLoaded would be a false alarm). With no key,
+  // the inline "API key required" affordance renders instead of an alert loop.
+  useEffect(() => {
+    if (!settingsLoaded || organizing || autoOrganizeAttempted.current) return;
+    if (!session || session.status !== 'processing') return;
+    if (transcript.length === 0) return;
+    if (!anthropicApiKey) return;
+    autoOrganizeAttempted.current = true;
+    triggerOrganization(session, transcript);
+  }, [settingsLoaded, anthropicApiKey, session, transcript, organizing]);
 
-    // Auto-organize if processing and we have a transcript
-    if (sess?.status === 'processing' && lines.length > 0) {
-      triggerOrganization(sess, lines);
+  const loadAll = async () => {
+    try {
+      setLoadError('');
+      const [sessRow, lines, t, i, iss, d, m] = await Promise.all([
+        getSession(id),
+        getTranscriptLines(id),
+        getTasks(id),
+        getIdeas(id),
+        getIssues(id),
+        getDecisions(id),
+        getMediaItems(id),
+      ]);
+
+      // A 'processing' session with no transcript can never organize — close the
+      // dead end by marking it complete instead of leaving it stuck forever.
+      let sess = sessRow;
+      if (sess && sess.status === 'processing' && lines.length === 0) {
+        await updateSession(id, { status: 'complete' });
+        sess = { ...sess, status: 'complete' };
+      }
+
+      setSession(sess);
+      setTranscript(lines);
+      setTasks(t);
+      setIdeas(i);
+      setIssues(iss);
+      setDecisions(d);
+      setMedia(m);
+      setLoadState('ready');
+    } catch (err: unknown) {
+      console.error('Failed to load session:', err);
+      setLoadError(err instanceof Error ? err.message : String(err));
+      setLoadState('error');
     }
   };
 
@@ -77,6 +106,7 @@ export default function ReviewScreen() {
       Alert.alert('Long Recording', `This session has ${lines.length} transcript lines. Organization may take longer.`, [{ text: 'OK' }]);
     }
     setOrganizing(true);
+    setOrganizeError(null);
     try {
       const [locs, staff] = await Promise.all([getContexts(), getStaff()]);
       const result = await organizeSession(lines, staff, locs, sess.title, anthropicApiKey || undefined);
@@ -113,21 +143,47 @@ export default function ReviewScreen() {
     } catch (err: unknown) {
       console.error('Organization failed:', err);
       const message = err instanceof Error ? err.message : String(err);
-      const isApiKeyError = message.toLowerCase().includes('api key') || message.toLowerCase().includes('authentication') || message.toLowerCase().includes('401');
-      await updateSession(id, { status: 'complete' });
-      await loadAll();
+      const lower = message.toLowerCase();
+      const isApiKeyError = lower.includes('api key') || lower.includes('authentication') || lower.includes('401');
+      // Do NOT force-complete here — the session stays in its current status so the
+      // "Organize with AI" retry affordance remains available.
       if (isApiKeyError) {
+        setOrganizeError('Your Anthropic API key is missing or was rejected. Add or fix it in Settings, then retry.');
         Alert.alert(
           'API Key Required',
           'Add your Anthropic API key in Settings to organize sessions.',
-          [{ text: 'OK' }]
+          [
+            { text: 'Open Settings', onPress: () => router.push('/(tabs)/settings') },
+            { text: 'Not Now', style: 'cancel' },
+          ]
         );
       } else {
-        Alert.alert('Could Not Organize', 'Something went wrong. You can retry by tapping "Organize with AI".', [{ text: 'OK' }]);
+        setOrganizeError(message);
+        Alert.alert('Could Not Organize', 'Something went wrong. Your transcript is safe — tap "Organize with AI" to retry.', [{ text: 'OK' }]);
       }
     } finally {
       setOrganizing(false);
     }
+  };
+
+  const handleOrganizePress = () => {
+    if (!session) return;
+    if (transcript.length === 0) {
+      Alert.alert('Nothing to Organize', 'This session has no transcript lines, so there is nothing for the AI to organize.', [{ text: 'OK' }]);
+      return;
+    }
+    if (settingsLoaded && !anthropicApiKey) {
+      Alert.alert(
+        'API Key Required',
+        'Add your Anthropic API key in Settings to organize sessions.',
+        [
+          { text: 'Open Settings', onPress: () => router.push('/(tabs)/settings') },
+          { text: 'Not Now', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+    triggerOrganization(session, transcript);
   };
 
   const handleTaskToggle = async (taskId: string, status: 'open' | 'done') => {
@@ -161,7 +217,15 @@ export default function ReviewScreen() {
     if (!session?.audio_uri || !player) return;
     try {
       setPlayingLineId(line.id);
-      player.seekTo(Math.max(0, line.start_time - 0.5));
+      // Legacy lines stored epoch seconds (~1.77e9) in start_time; seeking there
+      // lands past the end of the file. Treat clearly-out-of-range values as
+      // legacy and start from 0; clamp every seek to [0, duration].
+      const duration = player.duration; // seconds; 0 if not yet determined
+      const isLegacy = line.start_time > 86400 || (duration > 0 && line.start_time > duration);
+      let target = isLegacy ? 0 : line.start_time - 0.5;
+      target = Math.max(0, target);
+      if (duration > 0) target = Math.min(target, duration);
+      player.seekTo(target);
       player.play();
       // Clear indicator after 5 seconds
       setTimeout(() => setPlayingLineId(null), 5000);
@@ -176,7 +240,37 @@ export default function ReviewScreen() {
     setPlayingLineId(null);
   };
 
+  if (loadState === 'error') {
+    return (
+      <SafeAreaView className="flex-1 bg-bg items-center justify-center px-8">
+        <Ionicons name="alert-circle-outline" size={44} color="#ef4444" />
+        <Text className="text-text-primary font-bold text-base mt-3">Couldn't load this session</Text>
+        {loadError ? (
+          <Text className="text-text-secondary text-sm mt-1 text-center">{loadError}</Text>
+        ) : null}
+        <TouchableOpacity className="bg-brand-600 rounded-xl px-6 py-3 mt-5" onPress={loadAll}>
+          <Text className="text-white font-semibold text-sm">Try Again</Text>
+        </TouchableOpacity>
+        <TouchableOpacity className="mt-4" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text className="text-text-secondary text-sm">Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   if (!session) {
+    if (loadState === 'ready') {
+      return (
+        <SafeAreaView className="flex-1 bg-bg items-center justify-center px-8">
+          <Ionicons name="help-circle-outline" size={44} color="#9CA3AF" />
+          <Text className="text-text-primary font-bold text-base mt-3">Session not found</Text>
+          <Text className="text-text-secondary text-sm mt-1 text-center">This session may have been deleted.</Text>
+          <TouchableOpacity className="bg-brand-600 rounded-xl px-6 py-3 mt-5" onPress={() => router.back()}>
+            <Text className="text-white font-semibold text-sm">Go Back</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      );
+    }
     return (
       <SafeAreaView className="flex-1 bg-bg items-center justify-center">
         <ActivityIndicator color="#3B5BDB" size="large" />
@@ -265,6 +359,39 @@ export default function ReviewScreen() {
         >
           {activeTab === 'summary' && (
             <View>
+              {/* Missing API key — loud, with a path to Settings */}
+              {settingsLoaded && !anthropicApiKey && !session.summary && transcript.length > 0 && (
+                <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+                  <View className="flex-row items-center gap-2 mb-1">
+                    <Ionicons name="key-outline" size={16} color="#dc2626" />
+                    <Text className="text-red-700 font-semibold text-sm">API key required</Text>
+                  </View>
+                  <Text className="text-red-600 text-xs leading-relaxed">
+                    Add your Anthropic API key in Settings to organize this session with AI.
+                  </Text>
+                  <TouchableOpacity
+                    className="bg-red-600 rounded-xl px-4 py-2 mt-3 self-start"
+                    onPress={() => router.push('/(tabs)/settings')}
+                  >
+                    <Text className="text-white text-sm font-semibold">Open Settings</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Last organize attempt failed — visible, recoverable */}
+              {organizeError && !organizing ? (
+                <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+                  <View className="flex-row items-center gap-2 mb-1">
+                    <Ionicons name="warning-outline" size={16} color="#dc2626" />
+                    <Text className="text-red-700 font-semibold text-sm">Organization failed</Text>
+                  </View>
+                  <Text className="text-red-600 text-xs leading-relaxed">{organizeError}</Text>
+                  <Text className="text-text-secondary text-xs mt-1">
+                    Your transcript is safe — tap "Organize with AI" below to retry.
+                  </Text>
+                </View>
+              ) : null}
+
               {/* Summary */}
               {session.summary ? (
                 <View className="bg-white rounded-2xl border border-border p-4 mb-4">
@@ -374,14 +501,24 @@ export default function ReviewScreen() {
               )}
 
               {!session.summary && !organizing && (
-                <TouchableOpacity
-                  className="border-2 border-dashed border-border rounded-2xl p-6 items-center"
-                  onPress={() => triggerOrganization(session, transcript)}
-                >
-                  <Ionicons name="sparkles-outline" size={28} color="#D97706" />
-                  <Text className="text-text-primary font-semibold mt-2">Organize with AI</Text>
-                  <Text className="text-text-secondary text-xs mt-1 text-center">Pull what matters out of the transcript.</Text>
-                </TouchableOpacity>
+                transcript.length === 0 ? (
+                  <View className="border-2 border-dashed border-border rounded-2xl p-6 items-center">
+                    <Ionicons name="mic-off-outline" size={28} color="#9CA3AF" />
+                    <Text className="text-text-primary font-semibold mt-2">Nothing to organize</Text>
+                    <Text className="text-text-secondary text-xs mt-1 text-center">
+                      No transcript was captured in this session, so there is nothing for the AI to organize.
+                    </Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    className="border-2 border-dashed border-border rounded-2xl p-6 items-center"
+                    onPress={handleOrganizePress}
+                  >
+                    <Ionicons name="sparkles-outline" size={28} color="#D97706" />
+                    <Text className="text-text-primary font-semibold mt-2">Organize with AI</Text>
+                    <Text className="text-text-secondary text-xs mt-1 text-center">Pull what matters out of the transcript.</Text>
+                  </TouchableOpacity>
+                )
               )}
             </View>
           )}
@@ -443,6 +580,14 @@ export default function ReviewScreen() {
                 <View className="flex-row flex-wrap gap-2">
                   {media.map(item => (
                     <View key={item.id} className="w-[48%] aspect-square bg-bg rounded-xl overflow-hidden">
+                      {item.thumbnail_uri || item.type === 'photo' ? (
+                        <Image
+                          source={{ uri: item.thumbnail_uri || item.uri }}
+                          className="w-full h-full"
+                          resizeMode="cover"
+                          accessibilityLabel={item.note || (item.type === 'video' ? 'Video thumbnail' : 'Session photo')}
+                        />
+                      ) : null}
                       {item.note && (
                         <View className="absolute bottom-0 left-0 right-0 bg-black/50 p-2 z-10">
                           <Text className="text-white text-xs">{item.note}</Text>

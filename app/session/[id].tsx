@@ -15,13 +15,38 @@ import {
 import { saveAudioToDocuments, formatDuration, getRecordingElapsed, markRecordingStart, markPauseStart, markResumed } from '../../lib/transcription';
 import {
   useAudioRecorder,
-  requestRecordingPermissionsAsync,
   setAudioModeAsync,
   RecordingPresets,
 } from 'expo-audio';
 import { TranscriptLineView } from '../../components/TranscriptLine';
 import { TranscriptLine, Context, StaffMember } from '../../types';
 import { nanoid } from '../_utils';
+
+// Deterministic failures — retrying the same start options can never succeed.
+const FATAL_SPEECH_ERRORS = new Set<string>([
+  'not-allowed',
+  'service-not-allowed',
+  'language-not-supported',
+  'bad-grammar',
+]);
+
+// Bounded restarts for genuinely transient failures (network, audio-capture, interrupted, busy).
+const MAX_TRANSIENT_RESTARTS = 5;
+
+function fatalErrorMessage(code: string): string {
+  switch (code) {
+    case 'not-allowed':
+      return 'Microphone or speech recognition permission was denied. Enable both in iOS Settings, then start a new session.';
+    case 'service-not-allowed':
+      return 'Speech recognition is not available on this device right now.';
+    case 'language-not-supported':
+      return 'The transcription language (English) is not supported on this device.';
+    case 'bad-grammar':
+      return 'Speech recognition rejected the session configuration.';
+    default:
+      return 'Speech recognition stopped and cannot recover.';
+  }
+}
 
 export default function ActiveSessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,15 +60,28 @@ export default function ActiveSessionScreen() {
   const [activeSpeakerId, setActiveSpeakerId] = useState<string>('me');
   const [pendingText, setPendingText] = useState('');
   const [isStopping, setIsStopping] = useState(false);
+  const [recognitionError, setRecognitionError] = useState<string | null>(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  // Speech recognition
-  const recognitionStartTime = useRef(Date.now());
+  // Speech recognition lifecycle — refs (not async state) so the stop/pause/error
+  // races inside native event callbacks see the truth synchronously.
+  const recognitionStartElapsed = useRef(0); // seconds into the audio file when this recognition cycle began
+  const pausedRef = useRef(false);
+  const stoppingRef = useRef(false);
+  const fatalRef = useRef(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transientRestartsRef = useRef(0);
 
   useSpeechRecognitionEvent('result', (event) => {
     const text = event.results?.[0]?.transcript ?? '';
+    if (text.trim()) {
+      // The recognizer is demonstrably healthy — reset the transient failure budget.
+      transientRestartsRef.current = 0;
+    }
     if (event.isFinal && text.trim()) {
-      const now = Date.now();
-      const startTime = (recognitionStartTime.current - Date.now() + now) / 1000;
+      // Elapsed seconds into the recording (pause-aware) — matches the audio
+      // file timeline, so review tap-to-play can seekTo(start_time) directly.
+      const startTime = recognitionStartElapsed.current;
+      const endTime = Math.max(getRecordingElapsed(), startTime);
       const line: TranscriptLine = {
         id: nanoid(),
         session_id: id,
@@ -52,8 +90,8 @@ export default function ActiveSessionScreen() {
         speaker_color: activeSpeakerId === 'me' ? '#3B5BDB' : (staff.find(s => s.id === activeSpeakerId)?.color ?? '#6b7280'),
         text: text.trim(),
         start_time: startTime,
-        end_time: startTime + 2,
-        timestamp: now,
+        end_time: endTime,
+        timestamp: Date.now(),
         context_id: session.currentContextId ?? undefined,
         context_name: session.currentContextName ?? undefined,
       };
@@ -69,7 +107,7 @@ export default function ActiveSessionScreen() {
         context_id: line.context_id,
       });
       setPendingText('');
-      recognitionStartTime.current = Date.now();
+      recognitionStartElapsed.current = getRecordingElapsed();
       scrollRef.current?.scrollToEnd({ animated: true });
     } else {
       setPendingText(text);
@@ -77,23 +115,69 @@ export default function ActiveSessionScreen() {
   });
 
   useSpeechRecognitionEvent('error', (event) => {
+    if (event.error === 'aborted') {
+      // Fired by our own stop()/abort() — never blanket-restart on it.
+      // The 'end' handler decides, gated by the paused/stopping/fatal refs.
+      return;
+    }
+    if (FATAL_SPEECH_ERRORS.has(event.error)) {
+      fatalRef.current = true;
+      clearPendingRestart();
+      console.warn('Speech recognition fatal error:', event.error);
+      setRecognitionError(fatalErrorMessage(event.error));
+      return;
+    }
     if (event.error !== 'no-speech') {
       console.warn('Speech recognition error:', event.error);
     }
-    // Restart recognition automatically
-    if (session.isRecording && !session.isPaused) {
-      startListening();
+    if (stoppingRef.current || pausedRef.current || fatalRef.current) return;
+    if (event.error === 'no-speech') {
+      // Expected outcome of silence — this restart IS the continuous-listening
+      // loop working as designed, so it does not consume the failure budget.
+      scheduleRestart(500);
+      return;
     }
+    // Transient failure (network, audio-capture, interrupted, busy, …):
+    // bounded restarts with exponential backoff (1s → 2s → 4s → 8s → 8s).
+    transientRestartsRef.current += 1;
+    if (transientRestartsRef.current > MAX_TRANSIENT_RESTARTS) {
+      fatalRef.current = true;
+      clearPendingRestart();
+      setRecognitionError(
+        `Speech recognition keeps failing (${event.error}). Audio is still being recorded, but new speech is no longer transcribed.`
+      );
+      return;
+    }
+    scheduleRestart(Math.min(1000 * 2 ** (transientRestartsRef.current - 1), 8000));
   });
 
   useSpeechRecognitionEvent('end', () => {
-    if (session.isRecording && !session.isPaused && !isStopping) {
-      startListening();
-    }
+    if (stoppingRef.current || pausedRef.current || fatalRef.current) return;
+    if (!useActiveSession.getState().isRecording) return;
+    scheduleRestart(0);
   });
 
+  function clearPendingRestart() {
+    if (restartTimerRef.current !== null) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+  }
+
+  // Single funnel for all recognition restarts — the pending-timer guard makes
+  // back-to-back 'error' + 'end' events impossible to double-start.
+  function scheduleRestart(delayMs: number) {
+    if (restartTimerRef.current !== null) return;
+    restartTimerRef.current = setTimeout(() => {
+      restartTimerRef.current = null;
+      if (stoppingRef.current || pausedRef.current || fatalRef.current) return;
+      if (!useActiveSession.getState().isRecording) return;
+      startListening();
+    }, delayMs);
+  }
+
   function startListening() {
-    recognitionStartTime.current = Date.now();
+    recognitionStartElapsed.current = getRecordingElapsed();
     ExpoSpeechRecognitionModule.start({
       lang: 'en-US',
       continuous: false,
@@ -117,7 +201,14 @@ export default function ActiveSessionScreen() {
     setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
       .then(() => recorder.prepareToRecordAsync())
       .then(() => recorder.record())
-      .then(() => markRecordingStart())
+      .then(() => {
+        markRecordingStart();
+        // Re-anchor: startListening() above snapshotted getRecordingElapsed()
+        // BEFORE markRecordingStart() reset the module-scope clock, so for any
+        // session after the first it held the PREVIOUS session's elapsed time.
+        // Recording starts now, so this recognition cycle began at 0s.
+        recognitionStartElapsed.current = 0;
+      })
       .catch(console.error);
 
     // Elapsed timer
@@ -127,6 +218,7 @@ export default function ActiveSessionScreen() {
 
     return () => {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
+      clearPendingRestart();
     };
   }, []);
 
@@ -134,17 +226,56 @@ export default function ActiveSessionScreen() {
     if (session.isPaused) {
       await recorder.record();
       markResumed();
+      pausedRef.current = false;
       session.resumeSession();
-      ExpoSpeechRecognitionModule.start({
-        lang: 'en-US',
-        continuous: false,
-        interimResults: true,
-      });
+      transientRestartsRef.current = 0;
+      // Same options as the initial start (incl. contextualStrings).
+      if (!fatalRef.current) startListening();
     } else {
+      // Set the ref BEFORE stop(): the resulting 'end'/'aborted' events fire
+      // before session.pauseSession() lands, and must not restart recognition.
+      pausedRef.current = true;
+      clearPendingRestart();
       ExpoSpeechRecognitionModule.stop();
       await recorder.pause();
       markPauseStart();
       session.pauseSession();
+    }
+  };
+
+  // Normal stop path — also reachable from the recognition-error banner, so a
+  // fatal speech error never strands the session as a 'recording' orphan.
+  const finishSession = async () => {
+    if (stoppingRef.current) return;
+    stoppingRef.current = true;
+    setIsStopping(true);
+    clearPendingRestart();
+    ExpoSpeechRecognitionModule.stop();
+    if (elapsedRef.current) clearInterval(elapsedRef.current);
+
+    let savedUri: string | undefined;
+    try {
+      await recorder.stop();
+      const uri = recorder.uri ?? null;
+      savedUri = uri ? await saveAudioToDocuments(uri, id) : undefined;
+    } catch (err) {
+      // Audio finalize can fail when the recorder never started (e.g. fatal
+      // permission error) — still close out the session below.
+      console.error('Failed to finalize audio recording:', err);
+    }
+
+    try {
+      await updateSession(id, {
+        ended_at: Date.now(),
+        status: 'processing',
+        audio_uri: savedUri,
+      });
+      session.stopSession();
+      router.replace(`/review/${id}`);
+    } catch (err) {
+      console.error(err);
+      stoppingRef.current = false;
+      setIsStopping(false);
     }
   };
 
@@ -154,31 +285,7 @@ export default function ActiveSessionScreen() {
       'Stop recording and save the session?',
       [
         { text: 'Keep Recording', style: 'cancel' },
-        {
-          text: 'End Session',
-          style: 'destructive',
-          onPress: async () => {
-            setIsStopping(true);
-            ExpoSpeechRecognitionModule.stop();
-            if (elapsedRef.current) clearInterval(elapsedRef.current);
-
-            try {
-              await recorder.stop();
-              const uri = recorder.uri ?? null;
-              const savedUri = uri ? await saveAudioToDocuments(uri, id) : undefined;
-              await updateSession(id, {
-                ended_at: Date.now(),
-                status: 'processing',
-                audio_uri: savedUri,
-              });
-              session.stopSession();
-              router.replace(`/review/${id}`);
-            } catch (err) {
-              console.error(err);
-              setIsStopping(false);
-            }
-          },
-        },
+        { text: 'End Session', style: 'destructive', onPress: finishSession },
       ]
     );
   };
@@ -235,7 +342,7 @@ export default function ActiveSessionScreen() {
           <View className="flex-row items-center gap-2">
             <View className="w-2.5 h-2.5 rounded-full bg-red-500" style={{ opacity: session.isPaused ? 0.4 : 1 }} />
             <Text className="text-white font-bold text-base">
-              {session.isPaused ? 'PAUSED' : 'RECORDING'}
+              {session.isPaused ? 'PAUSED' : recognitionError ? 'AUDIO ONLY' : 'RECORDING'}
             </Text>
           </View>
           <Text className="text-red-400 font-mono text-xl font-bold">
@@ -255,6 +362,24 @@ export default function ActiveSessionScreen() {
           <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.5)" />
         </TouchableOpacity>
       </View>
+
+      {/* Speech recognition failure — visible, with a way out */}
+      {recognitionError ? (
+        <View className="mx-5 mb-3 bg-red-500/15 border border-red-500/60 rounded-xl p-3">
+          <View className="flex-row items-center gap-2 mb-1">
+            <Ionicons name="warning" size={16} color="#f87171" />
+            <Text className="text-red-400 font-bold text-sm">Transcription stopped</Text>
+          </View>
+          <Text className="text-white/90 text-xs leading-5 mb-2.5">{recognitionError}</Text>
+          <TouchableOpacity
+            className="bg-red-500 rounded-lg px-4 py-2 self-start"
+            onPress={finishSession}
+            disabled={isStopping}
+          >
+            <Text className="text-white font-semibold text-sm">End session</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {/* Transcript Area */}
       <View className="flex-1 bg-bg">

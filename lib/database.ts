@@ -1,13 +1,27 @@
 import * as SQLite from 'expo-sqlite';
 import { Session, TranscriptLine, Task, Idea, Issue, Decision, MediaItem, Context, StaffMember } from '../types';
 
-let db: SQLite.SQLiteDatabase | null = null;
+// T6 cold-start hardening: cache the PROMISE, not the resolved handle, so that
+// concurrent first callers share a single open+migrate run instead of racing
+// migrate() against each other (the v3 RENAME was the one unguarded statement).
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync('meet_ai.db');
-    await migrate(db);
+export function getDb(): Promise<SQLite.SQLiteDatabase> {
+  if (!dbPromise) {
+    dbPromise = openAndMigrate().catch((err) => {
+      // A6: clear the cache on rejection — otherwise one transient
+      // open/migrate failure caches a rejected promise and bricks every
+      // DB call until app kill, defeating the _layout retry/error UI.
+      dbPromise = null;
+      throw err;
+    });
   }
+  return dbPromise;
+}
+
+async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
+  const db = await SQLite.openDatabaseAsync('meet_ai.db');
+  await migrate(db);
   return db;
 }
 
@@ -144,7 +158,21 @@ async function migrate(db: SQLite.SQLiteDatabase) {
       "SELECT name FROM sqlite_master WHERE type='table' AND name='locations'"
     );
     if (locationsExists) {
-      await db.runAsync('ALTER TABLE locations RENAME TO contexts');
+      // T6 hardening (A6): promise-cached getDb() closes the in-runtime race,
+      // but a dev Fast Refresh can create a second module scope with a second
+      // connection where both pass the locationsExists check. If the RENAME
+      // fails, re-probe: if 'contexts' now exists the rename already happened
+      // elsewhere — safe to continue; otherwise rethrow (genuine failure).
+      try {
+        await db.runAsync('ALTER TABLE locations RENAME TO contexts');
+      } catch (renameErr) {
+        const contextsExists = await db.getFirstAsync<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='contexts'"
+        );
+        if (!contextsExists) {
+          throw renameErr;
+        }
+      }
     }
 
     // 2. contexts — context_type discriminator (ADR-003)

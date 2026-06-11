@@ -1,5 +1,6 @@
 import '../global.css';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -8,12 +9,51 @@ import { useSettings } from '../stores/settings';
 
 export default function RootLayout() {
   const loadSettings = useSettings(s => s.load);
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  // T6 cold-start hardening: if open/migrate fails, surface a visible error
+  // instead of a silent dead app. getDb() clears its promise cache on
+  // rejection, so Retry genuinely re-attempts open+migrate.
+  const initDb = useCallback(() => {
+    setDbError(null);
+    getDb()
+      .then(() => {
+        loadSettings();
+      })
+      .catch((err: unknown) => {
+        setDbError(err instanceof Error ? err.message : String(err));
+      });
+  }, [loadSettings]);
 
   useEffect(() => {
-    getDb().then(() => {
-      loadSettings();
-    });
+    initDb();
   }, []);
+
+  if (dbError !== null) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style="dark" />
+        <View className="flex-1 items-center justify-center bg-bg px-8">
+          <Text className="text-lg font-semibold text-recording mb-3 text-center">
+            The app's data store failed to open
+          </Text>
+          <Text className="text-sm text-text-secondary text-center mb-2">
+            Meet AI could not open its local database, so your sessions and
+            settings are unavailable. Try again, or close and relaunch the app.
+          </Text>
+          <Text className="text-xs text-text-tertiary text-center mb-6">
+            {dbError}
+          </Text>
+          <Pressable
+            onPress={initDb}
+            className="bg-brand-600 rounded-xl px-6 py-3 active:opacity-80"
+          >
+            <Text className="text-white font-semibold">Try again</Text>
+          </Pressable>
+        </View>
+      </GestureHandlerRootView>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

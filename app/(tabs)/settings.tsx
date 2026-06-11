@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, SafeAreaView,
   TextInput, TouchableOpacity, Alert, Switch, Linking,
@@ -7,13 +7,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../../stores/settings';
 
 export default function SettingsScreen() {
-  const { anthropicApiKey, ownerName, setApiKey, setOwnerName } = useSettings();
-  const [apiKeyInput, setApiKeyInput] = useState(anthropicApiKey);
-  const [ownerNameInput, setOwnerNameInput] = useState(ownerName);
+  const { anthropicApiKey, ownerName, isLoaded, setApiKey, setOwnerName } = useSettings();
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [ownerNameInput, setOwnerNameInput] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
+  const seededRef = useRef(false);
+
+  // Seed inputs exactly once, after the async settings load completes.
+  // Before that, inputs are non-editable and Save is disabled, so a
+  // persisted key can never be overwritten by the empty pre-load state.
+  // After seeding, Save persists exactly what is in the field —
+  // deliberately clearing the key and saving '' is a supported path.
+  useEffect(() => {
+    if (isLoaded && !seededRef.current) {
+      seededRef.current = true;
+      setApiKeyInput(anthropicApiKey);
+      setOwnerNameInput(ownerName);
+    }
+  }, [isLoaded, anthropicApiKey, ownerName]);
 
   const save = async () => {
+    if (!isLoaded) return;
     await Promise.all([
       setApiKey(apiKeyInput.trim()),
       setOwnerName(ownerNameInput.trim() || 'Owner'),
@@ -44,11 +59,20 @@ export default function SettingsScreen() {
               onChangeText={setOwnerNameInput}
               placeholder="Owner"
               returnKeyType="done"
+              editable={isLoaded}
             />
           </View>
 
           {/* AI Section */}
           <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">AI</Text>
+          {isLoaded && !anthropicApiKey && (
+            <View className="bg-amber-50 border border-amber-300 rounded-xl p-3 mb-3 flex-row gap-2 items-center">
+              <Ionicons name="warning-outline" size={18} color="#B45309" />
+              <Text className="flex-1 text-xs text-amber-700 font-semibold leading-relaxed">
+                API key required — the AI organizing step won't run until you add a key below and save.
+              </Text>
+            </View>
+          )}
           <View className="bg-white rounded-2xl border border-border p-4 mb-2">
             <Text className="text-text-primary font-medium mb-1">Anthropic API Key</Text>
             <Text className="text-text-secondary text-xs mb-3">
@@ -63,6 +87,7 @@ export default function SettingsScreen() {
                 secureTextEntry={!showKey}
                 autoCapitalize="none"
                 autoCorrect={false}
+                editable={isLoaded}
               />
               <TouchableOpacity className="px-3 py-3" onPress={() => setShowKey(!showKey)}>
                 <Ionicons name={showKey ? 'eye-off-outline' : 'eye-outline'} size={18} color="#6B7280" />
@@ -120,11 +145,14 @@ export default function SettingsScreen() {
           </View>
 
           <TouchableOpacity
-            className={`py-4 rounded-2xl items-center ${saved ? 'bg-green-500' : 'bg-brand-600'}`}
+            className={`py-4 rounded-2xl items-center ${
+              !isLoaded ? 'bg-gray-300' : saved ? 'bg-green-500' : 'bg-brand-600'
+            }`}
             onPress={save}
+            disabled={!isLoaded}
           >
             <Text className="text-white font-semibold">
-              {saved ? 'Saved' : 'Save'}
+              {!isLoaded ? 'Loading…' : saved ? 'Saved' : 'Save'}
             </Text>
           </TouchableOpacity>
         </ScrollView>

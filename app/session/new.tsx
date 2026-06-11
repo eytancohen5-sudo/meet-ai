@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import { getContexts, getStaff, createSession, addParticipant } from '../../lib/database';
 import { Context, StaffMember } from '../../types';
 import { useActiveSession } from '../../stores/session';
-import { requestRecordingPermissionsAsync } from 'expo-audio';
+import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { nanoid } from '../_utils';
 
 export default function NewSessionScreen() {
@@ -42,9 +42,14 @@ export default function NewSessionScreen() {
     if (starting) return;
     setStarting(true);
 
-    const { granted } = await requestRecordingPermissionsAsync();
+    // Requests BOTH microphone and speech recognition permissions on iOS
+    // (network-based recognition needs SFSpeechRecognizer authorization too).
+    const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
     if (!granted) {
-      Alert.alert('Microphone Required', 'Please allow microphone access to record sessions.');
+      Alert.alert(
+        'Permissions Required',
+        'Meet AI needs microphone and speech recognition access to record and transcribe sessions. Enable both in iOS Settings > Meet AI.'
+      );
       setStarting(false);
       return;
     }
