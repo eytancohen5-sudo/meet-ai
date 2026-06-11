@@ -30,6 +30,7 @@ const SETUP_COMPLETE_KEY = 'setup_complete';
 export default function SessionsScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   // Re-render when liveness changes; null whenever nothing is genuinely live.
   const liveSessionId = useActiveSession(s => (s.isRecording ? s.sessionId : null));
 
@@ -45,19 +46,26 @@ export default function SessionsScreen() {
   const setApiKey = useSettings(s => s.setApiKey);
 
   const load = useCallback(async () => {
-    // ADR-008 launch auto-close (challenger amendment 1): reclassify dead
-    // 'recording'/'paused' rows to 'interrupted' BEFORE the list renders, so no
-    // UI can ever treat a corpse as live. The live store id is read first —
-    // a genuinely live backgrounded recording is never swept.
-    await markInterruptedSessions(useActiveSession.getState().sessionId);
-    const [data, staff, setupFlag] = await Promise.all([
-      getSessions(),
-      getStaff(),
-      getSetting(SETUP_COMPLETE_KEY),
-    ]);
-    setSessions(data);
-    setStaffCount(staff.length);
-    setSetupComplete(setupFlag === '1');
+    try {
+      // ADR-008 launch auto-close (challenger amendment 1): reclassify dead
+      // 'recording'/'paused' rows to 'interrupted' BEFORE the list renders, so no
+      // UI can ever treat a corpse as live. The live store id is read first —
+      // a genuinely live backgrounded recording is never swept.
+      await markInterruptedSessions(useActiveSession.getState().sessionId);
+      const [data, staff, setupFlag] = await Promise.all([
+        getSessions(),
+        getStaff(),
+        getSetting(SETUP_COMPLETE_KEY),
+      ]);
+      setSessions(data);
+      setStaffCount(staff.length);
+      setSetupComplete(setupFlag === '1');
+      setLoadError(false);
+    } catch {
+      // MEET-R3-01: load never rejects, so onRefresh's setRefreshing(false)
+      // always runs — same loadError + NoticeBanner pattern as tasks.tsx.
+      setLoadError(true);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -208,6 +216,18 @@ export default function SessionsScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* DB-load failure surface (MEET-R3-01) — same pattern as tasks.tsx. */}
+          {loadError && (
+            <View className="mb-3">
+              <NoticeBanner
+                variant="error"
+                message="Couldn't load sessions"
+                actionLabel="Retry"
+                onAction={load}
+              />
+            </View>
+          )}
+
           {/* First-run SetupCard (Screen 9 / R1) — above the list. Full
               checklist before the first recording; one-row reminder after it
               until a key is saved; never rendered again once both exist. */}
@@ -308,8 +328,10 @@ export default function SessionsScreen() {
             </TouchableOpacity>
           )}
 
-          {/* First-run, the SetupCard takes the empty state's place (Screen 1). */}
-          {sessions.length === 0 && !showFullSetup ? (
+          {/* First-run, the SetupCard takes the empty state's place (Screen 1).
+              On loadError the empty state is suppressed — "Nothing here yet"
+              must never lie while sessions exist but failed to load. */}
+          {sessions.length === 0 && !showFullSetup && !loadError ? (
             <View className="items-center py-16">
               <Ionicons name="mic-outline" size={56} color="#E5E7EB" />
               <Text className="text-text-primary font-semibold text-lg mt-4">Nothing here yet.</Text>
