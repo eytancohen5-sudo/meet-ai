@@ -20,7 +20,7 @@ export function TaskCard({ task, onToggle, compact = false }: Props) {
   const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
 
   return (
-    <View className={`bg-white rounded-xl border border-app-border ${compact ? 'p-3' : 'p-4'} mb-2`}>
+    <View className={`bg-white rounded-xl border border-border ${compact ? 'p-3' : 'p-4'} mb-2`}>
       <View className="flex-row items-start gap-3">
         <TouchableOpacity
           onPress={() => onToggle?.(task.id, isDone ? 'open' : 'done')}
@@ -36,22 +36,22 @@ export function TaskCard({ task, onToggle, compact = false }: Props) {
 
         <View className="flex-1">
           <Text
-            className={`text-sm font-medium leading-snug ${isDone ? 'line-through text-gray-400' : 'text-gray-800'}`}
+            className={`text-sm font-medium leading-snug ${isDone ? 'line-through text-text-secondary' : 'text-text-primary'}`}
           >
             {task.title}
           </Text>
 
           <View className="flex-row flex-wrap gap-2 mt-2">
             {task.assigned_to_name && (
-              <View className="flex-row items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-full">
-                <Ionicons name="person-outline" size={10} color="#2D5A8E" />
-                <Text className="text-xs text-navy-700">{task.assigned_to_name}</Text>
+              <View className="flex-row items-center gap-1 bg-brand-50 px-2 py-0.5 rounded-full">
+                <Ionicons name="person-outline" size={10} color="#3B5BDB" />
+                <Text className="text-xs text-brand-600">{task.assigned_to_name}</Text>
               </View>
             )}
             {task.location_name && (
-              <View className="flex-row items-center gap-1 bg-gray-100 px-2 py-0.5 rounded-full">
-                <Ionicons name="location-outline" size={10} color="#6b7280" />
-                <Text className="text-xs text-gray-600">{task.location_name}</Text>
+              <View className="flex-row items-center gap-1 bg-bg px-2 py-0.5 rounded-full">
+                <Ionicons name="location-outline" size={10} color="#6B7280" />
+                <Text className="text-xs text-text-secondary">{task.location_name}</Text>
               </View>
             )}
             <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: priority.color + '20' }}>
@@ -60,7 +60,7 @@ export function TaskCard({ task, onToggle, compact = false }: Props) {
           </View>
 
           {task.notes && !compact && (
-            <Text className="text-xs text-gray-500 mt-2 leading-relaxed">{task.notes}</Text>
+            <Text className="text-xs text-text-secondary mt-2 leading-relaxed">{task.notes}</Text>
           )}
         </View>
       </View>

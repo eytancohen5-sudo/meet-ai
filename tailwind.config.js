@@ -8,6 +8,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Legacy tokens — used by shelved screens only (auth/, (member)/, invite/). Do not use in new code.
         navy: {
           50: '#f0f4f8',
           100: '#d9e2ec',
@@ -27,6 +28,23 @@ module.exports = {
           card: '#ffffff',
           border: '#e8e4dc',
         },
+        brand: {
+          50:  '#EDF2FF',
+          100: '#DBEAFE',
+          200: '#BFDBFE',
+          600: '#3B5BDB',
+          700: '#2F4AC7',
+          800: '#2340B0',
+        },
+        surface: '#FFFFFF',
+        bg: '#F8F9FB',
+        border: '#E5E7EB',
+        text: {
+          primary:   '#1A1D23',
+          secondary: '#4B5563',
+          tertiary:  '#6B7280',
+        },
+        recording: '#E53E3E',
       },
       fontFamily: {
         sans: ['System'],

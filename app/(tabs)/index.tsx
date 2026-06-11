@@ -57,17 +57,17 @@ export default function SessionsScreen() {
   const pastSessions = sessions.filter(s => s.status !== 'recording' && s.status !== 'paused');
 
   return (
-    <SafeAreaView className="flex-1 bg-navy-800">
+    <SafeAreaView className="flex-1 bg-bg">
       {/* Header */}
       <View className="px-5 pt-4 pb-5">
-        <Text className="text-white text-2xl font-bold tracking-tight">Meet AI</Text>
-        <Text className="text-navy-400 text-sm mt-1">Your meetings, on the record.</Text>
+        <Text className="text-text-primary text-2xl font-bold tracking-tight">Meet AI</Text>
+        <Text className="text-text-secondary text-sm mt-1">Your meetings, on the record.</Text>
       </View>
 
-      <View className="flex-1 bg-app-bg rounded-t-3xl">
+      <View className="flex-1 bg-bg">
         <ScrollView
           contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 16, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1E3A5F" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B5BDB" />}
           showsVerticalScrollIndicator={false}
         >
           {/* Active session banner */}
@@ -87,9 +87,9 @@ export default function SessionsScreen() {
 
           {sessions.length === 0 ? (
             <View className="items-center py-16">
-              <Ionicons name="mic-outline" size={56} color="#D9E2EC" />
-              <Text className="text-navy-800 font-semibold text-lg mt-4">Nothing here yet.</Text>
-              <Text className="text-navy-400 text-sm mt-2 text-center px-8">
+              <Ionicons name="mic-outline" size={56} color="#E5E7EB" />
+              <Text className="text-text-primary font-semibold text-lg mt-4">Nothing here yet.</Text>
+              <Text className="text-text-secondary text-sm mt-2 text-center px-8">
                 Hit the button below to start your first walkthrough. It listens so you don't have to remember.
               </Text>
             </View>
@@ -97,7 +97,7 @@ export default function SessionsScreen() {
             <>
               {pastSessions.length > 0 && (
                 <>
-                  <Text className="text-navy-800 font-semibold text-sm mb-3 uppercase tracking-wide">
+                  <Text className="text-text-primary font-semibold text-sm mb-3 uppercase tracking-wide">
                     Recent Sessions
                   </Text>
                   {pastSessions.map(session => (
@@ -116,10 +116,10 @@ export default function SessionsScreen() {
 
         {/* FAB */}
         <TouchableOpacity
-          className="absolute bottom-8 right-5 w-16 h-16 bg-navy-800 rounded-full items-center justify-center shadow-lg"
+          className="absolute bottom-8 right-5 w-16 h-16 bg-brand-600 rounded-full items-center justify-center shadow-lg"
           onPress={() => router.push('/session/new')}
           style={{
-            shadowColor: '#1E3A5F',
+            shadowColor: '#3B5BDB',
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.4,
             shadowRadius: 8,

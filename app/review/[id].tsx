@@ -178,8 +178,8 @@ export default function ReviewScreen() {
 
   if (!session) {
     return (
-      <SafeAreaView className="flex-1 bg-navy-800 items-center justify-center">
-        <ActivityIndicator color="white" size="large" />
+      <SafeAreaView className="flex-1 bg-bg items-center justify-center">
+        <ActivityIndicator color="#3B5BDB" size="large" />
       </SafeAreaView>
     );
   }
@@ -187,34 +187,34 @@ export default function ReviewScreen() {
   const openCount = tasks.filter(t => t.status === 'open').length;
 
   return (
-    <SafeAreaView className="flex-1 bg-navy-800">
+    <SafeAreaView className="flex-1 bg-bg">
       {/* Header */}
       <View className="px-5 pt-3 pb-4">
         <View className="flex-row items-center mb-2">
           <TouchableOpacity onPress={() => router.back()} className="mr-3" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={24} color="white" />
+            <Ionicons name="arrow-back" size={24} color="#1A1D23" />
           </TouchableOpacity>
-          <Text className="text-white text-lg font-bold flex-1" numberOfLines={1}>{session.title}</Text>
+          <Text className="text-text-primary text-lg font-bold flex-1" numberOfLines={1}>{session.title}</Text>
           <TouchableOpacity onPress={handleShare} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="share-outline" size={22} color="white" />
+            <Ionicons name="share-outline" size={22} color="#1A1D23" />
           </TouchableOpacity>
         </View>
         <View className="flex-row gap-3 flex-wrap">
           {session.context_name && (
             <View className="flex-row items-center gap-1">
-              <Ionicons name="location-outline" size={12} color="#9cb3c9" />
-              <Text className="text-navy-400 text-xs">{session.context_name}</Text>
+              <Ionicons name="location-outline" size={12} color="#6B7280" />
+              <Text className="text-text-secondary text-xs">{session.context_name}</Text>
             </View>
           )}
           <View className="flex-row items-center gap-1">
-            <Ionicons name="calendar-outline" size={12} color="#9cb3c9" />
-            <Text className="text-navy-400 text-xs">
+            <Ionicons name="calendar-outline" size={12} color="#6B7280" />
+            <Text className="text-text-secondary text-xs">
               {new Date(session.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </Text>
           </View>
           {openCount > 0 && (
-            <View className="flex-row items-center gap-1 bg-orange-400/20 px-2 py-0.5 rounded-full">
-              <Text className="text-orange-400 text-xs font-medium">{openCount} open task{openCount !== 1 ? 's' : ''}</Text>
+            <View className="flex-row items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-full">
+              <Text className="text-amber-700 text-xs font-medium">{openCount} open task{openCount !== 1 ? 's' : ''}</Text>
             </View>
           )}
         </View>
@@ -224,14 +224,14 @@ export default function ReviewScreen() {
       {organizing && (
         <View className="absolute inset-0 bg-black/50 z-50 items-center justify-center">
           <View className="bg-white rounded-2xl p-6 items-center mx-8">
-            <ActivityIndicator color="#1E3A5F" size="large" />
-            <Text className="text-navy-800 font-semibold text-base mt-4">Reading the room...</Text>
-            <Text className="text-gray-400 text-sm mt-1 text-center">Sorting out what matters.</Text>
+            <ActivityIndicator color="#3B5BDB" size="large" />
+            <Text className="text-text-primary font-semibold text-base mt-4">Reading the room...</Text>
+            <Text className="text-text-secondary text-sm mt-1 text-center">Sorting out what matters.</Text>
           </View>
         </View>
       )}
 
-      <View className="flex-1 bg-app-bg rounded-t-3xl">
+      <View className="flex-1 bg-bg">
         {/* Tab Bar */}
         <ScrollView
           horizontal
@@ -247,11 +247,11 @@ export default function ReviewScreen() {
           ] as const).map(tab => (
             <TouchableOpacity
               key={tab.id}
-              className={`flex-row items-center gap-1.5 px-4 py-2 rounded-full border ${activeTab === tab.id ? 'bg-navy-800 border-navy-800' : 'bg-white border-gray-200'}`}
+              className={`flex-row items-center gap-1.5 px-4 py-2 rounded-full border ${activeTab === tab.id ? 'bg-brand-600 border-brand-600' : 'bg-white border-border'}`}
               onPress={() => setActiveTab(tab.id as Tab)}
             >
-              <Ionicons name={tab.icon as any} size={14} color={activeTab === tab.id ? 'white' : '#6b7280'} />
-              <Text className={`text-sm font-medium ${activeTab === tab.id ? 'text-white' : 'text-gray-600'}`}>
+              <Ionicons name={tab.icon as any} size={14} color={activeTab === tab.id ? 'white' : '#6B7280'} />
+              <Text className={`text-sm font-medium ${activeTab === tab.id ? 'text-white' : 'text-text-secondary'}`}>
                 {tab.label}
               </Text>
             </TouchableOpacity>
@@ -267,12 +267,12 @@ export default function ReviewScreen() {
             <View>
               {/* Summary */}
               {session.summary ? (
-                <View className="bg-white rounded-2xl border border-app-border p-4 mb-4">
+                <View className="bg-white rounded-2xl border border-border p-4 mb-4">
                   <View className="flex-row items-center gap-2 mb-2">
-                    <Ionicons name="sparkles-outline" size={16} color="#C9A84C" />
-                    <Text className="text-navy-800 font-semibold text-sm">AI Summary</Text>
+                    <Ionicons name="sparkles-outline" size={16} color="#D97706" />
+                    <Text className="text-text-primary font-semibold text-sm">AI Summary</Text>
                   </View>
-                  <Text className="text-gray-700 text-sm leading-relaxed">{session.summary}</Text>
+                  <Text className="text-text-secondary text-sm leading-relaxed">{session.summary}</Text>
                 </View>
               ) : null}
 
@@ -280,13 +280,13 @@ export default function ReviewScreen() {
               <View className="flex-row gap-3 mb-4">
                 {[
                   { label: 'Tasks', count: tasks.length, color: '#E06C1A', icon: 'checkbox-outline' },
-                  { label: 'Ideas', count: ideas.length, color: '#C9A84C', icon: 'bulb-outline' },
+                  { label: 'Ideas', count: ideas.length, color: '#D97706', icon: 'bulb-outline' },
                   { label: 'Issues', count: issues.length, color: '#ef4444', icon: 'warning-outline' },
                 ].map(stat => (
-                  <View key={stat.label} className="flex-1 bg-white rounded-2xl border border-app-border p-3 items-center">
+                  <View key={stat.label} className="flex-1 bg-white rounded-2xl border border-border p-3 items-center">
                     <Ionicons name={stat.icon as any} size={20} color={stat.color} />
-                    <Text className="text-2xl font-bold text-navy-800 mt-1">{stat.count}</Text>
-                    <Text className="text-gray-400 text-xs">{stat.label}</Text>
+                    <Text className="text-2xl font-bold text-text-primary mt-1">{stat.count}</Text>
+                    <Text className="text-text-secondary text-xs">{stat.label}</Text>
                   </View>
                 ))}
               </View>
@@ -295,20 +295,20 @@ export default function ReviewScreen() {
               {tasks.filter(t => t.status === 'open').length > 0 && (
                 <View className="mb-4">
                   <View className="flex-row items-center justify-between mb-2">
-                    <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide">Open Tasks</Text>
+                    <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wide">Open Tasks</Text>
                     {tasks.filter(t => t.status === 'open').length > 3 && (
                       <TouchableOpacity onPress={() => setActiveTab('tasks')}>
-                        <Text className="text-navy-600 text-xs font-medium">See all →</Text>
+                        <Text className="text-brand-600 text-xs font-medium">See all →</Text>
                       </TouchableOpacity>
                     )}
                   </View>
                   {tasks.filter(t => t.status === 'open').slice(0, 3).map(task => (
-                    <View key={task.id} className="bg-white rounded-xl border border-app-border p-3 mb-2 flex-row items-start gap-3">
+                    <View key={task.id} className="bg-white rounded-xl border border-border p-3 mb-2 flex-row items-start gap-3">
                       <View className="w-5 h-5 rounded border-2 border-gray-300 mt-0.5" />
                       <View className="flex-1">
-                        <Text className="text-gray-800 text-sm font-medium">{task.title}</Text>
+                        <Text className="text-text-primary text-sm font-medium">{task.title}</Text>
                         {task.assigned_to_name && (
-                          <Text className="text-gray-400 text-xs mt-0.5">→ {task.assigned_to_name}</Text>
+                          <Text className="text-text-secondary text-xs mt-0.5">→ {task.assigned_to_name}</Text>
                         )}
                       </View>
                       <View className={`px-2 py-0.5 rounded-full ${task.priority === 'high' ? 'bg-red-50' : task.priority === 'low' ? 'bg-green-50' : 'bg-amber-50'}`}>
@@ -324,18 +324,18 @@ export default function ReviewScreen() {
               {/* Issues */}
               {issues.length > 0 && (
                 <View className="mb-4">
-                  <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Issues</Text>
+                  <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-2">Issues</Text>
                   {issues.map(issue => (
-                    <View key={issue.id} className="bg-white rounded-xl border border-app-border p-3 mb-2">
+                    <View key={issue.id} className="bg-white rounded-xl border border-border p-3 mb-2">
                       <View className="flex-row items-center gap-2">
                         <View className="w-2 h-2 rounded-full" style={{ backgroundColor: SEVERITY_COLOR[issue.severity] }} />
-                        <Text className="text-gray-800 font-medium text-sm flex-1">{issue.title}</Text>
+                        <Text className="text-text-primary font-medium text-sm flex-1">{issue.title}</Text>
                         {issue.location_name && (
-                          <Text className="text-gray-400 text-xs">{issue.location_name}</Text>
+                          <Text className="text-text-secondary text-xs">{issue.location_name}</Text>
                         )}
                       </View>
                       {issue.description && (
-                        <Text className="text-gray-500 text-xs mt-1 ml-4">{issue.description}</Text>
+                        <Text className="text-text-secondary text-xs mt-1 ml-4">{issue.description}</Text>
                       )}
                     </View>
                   ))}
@@ -345,12 +345,12 @@ export default function ReviewScreen() {
               {/* Ideas */}
               {ideas.length > 0 && (
                 <View className="mb-4">
-                  <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Ideas</Text>
+                  <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-2">Ideas</Text>
                   {ideas.map(idea => (
                     <View key={idea.id} className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-2 flex-row gap-2">
                       <Text className="text-lg">💡</Text>
                       <View className="flex-1">
-                        <Text className="text-gray-800 text-sm">{idea.text}</Text>
+                        <Text className="text-text-primary text-sm">{idea.text}</Text>
                         {idea.category && (
                           <Text className="text-amber-500 text-xs mt-1 capitalize">{idea.category}</Text>
                         )}
@@ -363,11 +363,11 @@ export default function ReviewScreen() {
               {/* Decisions */}
               {decisions.length > 0 && (
                 <View className="mb-4">
-                  <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">Decisions</Text>
+                  <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-2">Decisions</Text>
                   {decisions.map(d => (
                     <View key={d.id} className="bg-green-50 border border-green-100 rounded-xl p-3 mb-2 flex-row gap-2">
                       <Ionicons name="checkmark-done-outline" size={16} color="#15803d" />
-                      <Text className="flex-1 text-gray-800 text-sm">{d.text}</Text>
+                      <Text className="flex-1 text-text-primary text-sm">{d.text}</Text>
                     </View>
                   ))}
                 </View>
@@ -375,12 +375,12 @@ export default function ReviewScreen() {
 
               {!session.summary && !organizing && (
                 <TouchableOpacity
-                  className="border-2 border-dashed border-gray-200 rounded-2xl p-6 items-center"
+                  className="border-2 border-dashed border-border rounded-2xl p-6 items-center"
                   onPress={() => triggerOrganization(session, transcript)}
                 >
-                  <Ionicons name="sparkles-outline" size={28} color="#C9A84C" />
-                  <Text className="text-navy-800 font-semibold mt-2">Organize with AI</Text>
-                  <Text className="text-gray-400 text-xs mt-1 text-center">Pull what matters out of the transcript.</Text>
+                  <Ionicons name="sparkles-outline" size={28} color="#D97706" />
+                  <Text className="text-text-primary font-semibold mt-2">Organize with AI</Text>
+                  <Text className="text-text-secondary text-xs mt-1 text-center">Pull what matters out of the transcript.</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -390,8 +390,8 @@ export default function ReviewScreen() {
             <View>
               {tasks.length === 0 ? (
                 <View className="items-center py-12">
-                  <Ionicons name="checkbox-outline" size={40} color="#D9E2EC" />
-                  <Text className="text-gray-400 text-sm mt-3 text-center">No tasks found.</Text>
+                  <Ionicons name="checkbox-outline" size={40} color="#E5E7EB" />
+                  <Text className="text-text-secondary text-sm mt-3 text-center">No tasks found.</Text>
                 </View>
               ) : (
                 tasks.map(task => (
@@ -405,18 +405,18 @@ export default function ReviewScreen() {
             <View>
               {player?.playing && (
                 <TouchableOpacity
-                  className="flex-row items-center gap-2 bg-navy-50 border border-navy-100 rounded-xl p-3 mb-3"
+                  className="flex-row items-center gap-2 bg-brand-50 border border-brand-100 rounded-xl p-3 mb-3"
                   onPress={stopPlayback}
                 >
                   <View className="w-2 h-2 rounded-full bg-red-500" />
-                  <Text className="text-navy-800 text-sm flex-1">Playing audio</Text>
-                  <Ionicons name="stop-circle-outline" size={18} color="#1E3A5F" />
+                  <Text className="text-text-primary text-sm flex-1">Playing audio</Text>
+                  <Ionicons name="stop-circle-outline" size={18} color="#3B5BDB" />
                 </TouchableOpacity>
               )}
               {transcript.length === 0 ? (
                 <View className="items-center py-12">
-                  <Ionicons name="chatbubbles-outline" size={40} color="#D9E2EC" />
-                  <Text className="text-gray-400 text-sm mt-3">Nothing recorded.</Text>
+                  <Ionicons name="chatbubbles-outline" size={40} color="#E5E7EB" />
+                  <Text className="text-text-secondary text-sm mt-3">Nothing recorded.</Text>
                 </View>
               ) : (
                 transcript.map(line => (
@@ -436,13 +436,13 @@ export default function ReviewScreen() {
             <View>
               {media.length === 0 ? (
                 <View className="items-center py-12">
-                  <Ionicons name="images-outline" size={40} color="#D9E2EC" />
-                  <Text className="text-gray-400 text-sm mt-3">No media attached</Text>
+                  <Ionicons name="images-outline" size={40} color="#E5E7EB" />
+                  <Text className="text-text-secondary text-sm mt-3">No media attached</Text>
                 </View>
               ) : (
                 <View className="flex-row flex-wrap gap-2">
                   {media.map(item => (
-                    <View key={item.id} className="w-[48%] aspect-square bg-gray-100 rounded-xl overflow-hidden">
+                    <View key={item.id} className="w-[48%] aspect-square bg-bg rounded-xl overflow-hidden">
                       {item.note && (
                         <View className="absolute bottom-0 left-0 right-0 bg-black/50 p-2 z-10">
                           <Text className="text-white text-xs">{item.note}</Text>

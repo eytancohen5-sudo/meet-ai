@@ -30,12 +30,12 @@ export function SessionCard({ session, onPress, onLongPress }: Props) {
     <TouchableOpacity
       onPress={onPress}
       onLongPress={onLongPress}
-      className="bg-white rounded-2xl p-4 mb-3 shadow-sm border border-app-border"
+      className="bg-white rounded-2xl p-4 mb-3 shadow-sm border border-border"
       activeOpacity={0.7}
     >
       <View className="flex-row items-start justify-between mb-2">
         <View className="flex-1 mr-3">
-          <Text className="text-navy-800 font-semibold text-base leading-tight" numberOfLines={2}>
+          <Text className="text-text-primary font-semibold text-base leading-tight" numberOfLines={2}>
             {session.title}
           </Text>
         </View>
@@ -50,33 +50,33 @@ export function SessionCard({ session, onPress, onLongPress }: Props) {
       <View className="flex-row items-center gap-3 flex-wrap">
         {session.context_name && (
           <View className="flex-row items-center gap-1">
-            <Ionicons name="location-outline" size={13} color="#6E8FAC" />
-            <Text className="text-navy-400 text-xs">{session.context_name}</Text>
+            <Ionicons name="location-outline" size={13} color="#6B7280" />
+            <Text className="text-text-secondary text-xs">{session.context_name}</Text>
           </View>
         )}
         <View className="flex-row items-center gap-1">
-          <Ionicons name="calendar-outline" size={13} color="#6E8FAC" />
-          <Text className="text-navy-400 text-xs">{dateStr} · {timeStr}</Text>
+          <Ionicons name="calendar-outline" size={13} color="#6B7280" />
+          <Text className="text-text-secondary text-xs">{dateStr} · {timeStr}</Text>
         </View>
         {duration && (
           <View className="flex-row items-center gap-1">
-            <Ionicons name="time-outline" size={13} color="#6E8FAC" />
-            <Text className="text-navy-400 text-xs">{duration}</Text>
+            <Ionicons name="time-outline" size={13} color="#6B7280" />
+            <Text className="text-text-secondary text-xs">{duration}</Text>
           </View>
         )}
       </View>
 
       {(session.participant_names?.length ?? 0) > 0 && (
         <View className="flex-row items-center gap-1 mt-2">
-          <Ionicons name="people-outline" size={13} color="#6E8FAC" />
-          <Text className="text-navy-400 text-xs" numberOfLines={1}>
+          <Ionicons name="people-outline" size={13} color="#6B7280" />
+          <Text className="text-text-secondary text-xs" numberOfLines={1}>
             {session.participant_names?.join(', ')}
           </Text>
         </View>
       )}
 
       {session.status === 'complete' && (
-        <View className="flex-row gap-3 mt-3 pt-3 border-t border-app-border">
+        <View className="flex-row gap-3 mt-3 pt-3 border-t border-border">
           {(session.task_count ?? 0) > 0 && (
             <View className="flex-row items-center gap-1">
               <Ionicons name="checkbox-outline" size={13} color="#E06C1A" />
@@ -85,8 +85,8 @@ export function SessionCard({ session, onPress, onLongPress }: Props) {
           )}
           {(session.idea_count ?? 0) > 0 && (
             <View className="flex-row items-center gap-1">
-              <Ionicons name="bulb-outline" size={13} color="#C9A84C" />
-              <Text className="text-xs" style={{ color: '#C9A84C' }}>{session.idea_count} idea{session.idea_count !== 1 ? 's' : ''}</Text>
+              <Ionicons name="bulb-outline" size={13} color="#D97706" />
+              <Text className="text-xs" style={{ color: '#D97706' }}>{session.idea_count} idea{session.idea_count !== 1 ? 's' : ''}</Text>
             </View>
           )}
         </View>

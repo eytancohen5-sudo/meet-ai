@@ -35,18 +35,18 @@ export function TranscriptLineView({ line, isOwner, onPress }: Props) {
           {isMe ? 'You' : line.speaker_name}
         </Text>
         {line.context_name && (
-          <View className="bg-navy-50 px-2 py-0.5 rounded-full">
-            <Text className="text-xs text-navy-400">{line.context_name}</Text>
+          <View className="bg-brand-50 px-2 py-0.5 rounded-full">
+            <Text className="text-xs text-brand-600">{line.context_name}</Text>
           </View>
         )}
-        <Text className="text-xs text-gray-400 ml-auto">{time}</Text>
+        <Text className="text-xs text-text-secondary ml-auto">{time}</Text>
       </View>
 
       <View
         className="ml-8 rounded-xl rounded-tl-sm p-3"
-        style={{ backgroundColor: isMe ? '#EFF6FF' : '#F8F6F0' }}
+        style={{ backgroundColor: isMe ? '#EDF2FF' : '#F8F9FB' }}
       >
-        <Text className="text-gray-800 text-sm leading-relaxed">{line.text}</Text>
+        <Text className="text-text-primary text-sm leading-relaxed">{line.text}</Text>
       </View>
     </TouchableOpacity>
   );

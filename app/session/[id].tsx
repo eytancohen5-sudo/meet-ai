@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   Alert, SafeAreaView, Modal, FlatList, Image, Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -48,7 +49,7 @@ export default function ActiveSessionScreen() {
         session_id: id,
         speaker_id: activeSpeakerId,
         speaker_name: activeSpeakerId === 'me' ? 'You' : (staff.find(s => s.id === activeSpeakerId)?.name ?? activeSpeakerId),
-        speaker_color: activeSpeakerId === 'me' ? '#1E3A5F' : (staff.find(s => s.id === activeSpeakerId)?.color ?? '#6b7280'),
+        speaker_color: activeSpeakerId === 'me' ? '#3B5BDB' : (staff.find(s => s.id === activeSpeakerId)?.color ?? '#6b7280'),
         text: text.trim(),
         start_time: startTime,
         end_time: startTime + 2,
@@ -206,7 +207,7 @@ export default function ActiveSessionScreen() {
   };
 
   const currentSpeaker = activeSpeakerId === 'me'
-    ? { name: 'You', color: '#1E3A5F', initials: 'ME' }
+    ? { name: 'You', color: '#3B5BDB', initials: 'ME' }
     : staff.find(s => s.id === activeSpeakerId) ? {
         name: staff.find(s => s.id === activeSpeakerId)!.name,
         color: staff.find(s => s.id === activeSpeakerId)!.color,
@@ -216,9 +217,9 @@ export default function ActiveSessionScreen() {
   if (Platform.OS === 'web') {
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center p-8">
-        <Ionicons name="phone-portrait-outline" size={48} color="#D9E2EC" />
-        <Text className="text-navy-800 font-semibold text-lg mt-4">Mobile app required</Text>
-        <Text className="text-gray-400 text-sm mt-2 text-center">
+        <Ionicons name="phone-portrait-outline" size={48} color="#E5E7EB" />
+        <Text className="text-text-primary font-semibold text-lg mt-4">Mobile app required</Text>
+        <Text className="text-text-secondary text-sm mt-2 text-center">
           Recording is only available in the Meet AI mobile app.
         </Text>
       </SafeAreaView>
@@ -227,6 +228,7 @@ export default function ActiveSessionScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-950">
+      <StatusBar style="light" />
       {/* Recording Header */}
       <View className="px-5 pt-3 pb-4">
         <View className="flex-row items-center justify-between mb-2">
@@ -246,7 +248,7 @@ export default function ActiveSessionScreen() {
           className="flex-row items-center gap-2 bg-white/10 rounded-xl px-3 py-2 self-start"
           onPress={() => setShowContextPicker(true)}
         >
-          <Ionicons name="location" size={14} color="#C9A84C" />
+          <Ionicons name="location" size={14} color="#D97706" />
           <Text className="text-white text-sm font-medium">
             {session.currentContextName ?? 'Where are you?'}
           </Text>
@@ -255,7 +257,7 @@ export default function ActiveSessionScreen() {
       </View>
 
       {/* Transcript Area */}
-      <View className="flex-1 bg-app-bg">
+      <View className="flex-1 bg-bg">
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
@@ -264,8 +266,8 @@ export default function ActiveSessionScreen() {
         >
           {session.transcriptLines.length === 0 && !pendingText ? (
             <View className="items-center py-12">
-              <Ionicons name="mic-outline" size={40} color="#D9E2EC" />
-              <Text className="text-gray-400 text-sm mt-3 text-center">
+              <Ionicons name="mic-outline" size={40} color="#E5E7EB" />
+              <Text className="text-text-secondary text-sm mt-3 text-center">
                 Listening. Say something.
               </Text>
             </View>
@@ -282,12 +284,12 @@ export default function ActiveSessionScreen() {
                 <View className="mb-3 opacity-50">
                   <View className="flex-row items-center gap-2 mb-1">
                     <View className="w-6 h-6 rounded-full bg-gray-200 items-center justify-center">
-                      <Text className="text-xs font-bold text-gray-500">{currentSpeaker.initials.charAt(0)}</Text>
+                      <Text className="text-xs font-bold text-text-secondary">{currentSpeaker.initials.charAt(0)}</Text>
                     </View>
-                    <Text className="text-xs text-gray-400 italic">{currentSpeaker.name} (listening...)</Text>
+                    <Text className="text-xs text-text-secondary italic">{currentSpeaker.name} (listening...)</Text>
                   </View>
                   <View className="ml-8 bg-gray-100 rounded-xl rounded-tl-sm p-3">
-                    <Text className="text-gray-500 text-sm italic">{pendingText}</Text>
+                    <Text className="text-text-secondary text-sm italic">{pendingText}</Text>
                   </View>
                 </View>
               ) : null}
@@ -296,7 +298,7 @@ export default function ActiveSessionScreen() {
         </ScrollView>
 
         {/* Bottom Controls */}
-        <View className="bg-white border-t border-app-border px-4 pt-3 pb-8">
+        <View className="bg-white border-t border-border px-4 pt-3 pb-8">
           {/* Speaker chips — tap to switch, no modal */}
           {session.participantIds.length > 0 && (
             <ScrollView
@@ -304,16 +306,16 @@ export default function ActiveSessionScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ gap: 8, paddingBottom: 8 }}
             >
-              {[{ id: 'me', name: 'You', color: '#1E3A5F', avatar_initials: 'ME' }, ...staff.filter(s => session.participantIds.includes(s.id))].map(p => (
+              {[{ id: 'me', name: 'You', color: '#3B5BDB', avatar_initials: 'ME' }, ...staff.filter(s => session.participantIds.includes(s.id))].map(p => (
                 <TouchableOpacity
                   key={p.id}
                   onPress={() => setActiveSpeakerId(p.id)}
-                  className={`flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border ${activeSpeakerId === p.id ? 'border-navy-800 bg-navy-100' : 'border-gray-200 bg-white'}`}
+                  className={`flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border ${activeSpeakerId === p.id ? 'border-brand-600 bg-brand-50' : 'border-border bg-white'}`}
                 >
                   <View className="w-5 h-5 rounded-full items-center justify-center" style={{ backgroundColor: p.color + '30' }}>
                     <Text className="text-xs font-bold" style={{ color: p.color }}>{p.avatar_initials?.charAt(0) ?? '?'}</Text>
                   </View>
-                  <Text className={`text-xs font-medium ${activeSpeakerId === p.id ? 'text-navy-800' : 'text-gray-600'}`}>{p.name}</Text>
+                  <Text className={`text-xs font-medium ${activeSpeakerId === p.id ? 'text-text-primary' : 'text-text-secondary'}`}>{p.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -332,7 +334,7 @@ export default function ActiveSessionScreen() {
               className="w-16 h-16 bg-gray-100 rounded-full items-center justify-center"
               onPress={handlePauseResume}
             >
-              <Ionicons name={session.isPaused ? 'play' : 'pause'} size={26} color="#1E3A5F" />
+              <Ionicons name={session.isPaused ? 'play' : 'pause'} size={26} color="#3B5BDB" />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -350,10 +352,10 @@ export default function ActiveSessionScreen() {
       {/* Context Picker Modal */}
       <Modal visible={showContextPicker} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView className="flex-1 bg-white">
-          <View className="flex-row items-center px-5 pt-4 pb-4 border-b border-gray-100">
-            <Text className="text-navy-800 text-lg font-bold flex-1">Where are you?</Text>
+          <View className="flex-row items-center px-5 pt-4 pb-4 border-b border-border">
+            <Text className="text-text-primary text-lg font-bold flex-1">Where are you?</Text>
             <TouchableOpacity onPress={() => setShowContextPicker(false)}>
-              <Ionicons name="close" size={24} color="#1E3A5F" />
+              <Ionicons name="close" size={24} color="#3B5BDB" />
             </TouchableOpacity>
           </View>
           <FlatList
@@ -362,7 +364,7 @@ export default function ActiveSessionScreen() {
             contentContainerStyle={{ padding: 16 }}
             renderItem={({ item }) => (
               <TouchableOpacity
-                className={`mb-2 rounded-xl border overflow-hidden ${session.currentContextId === item.id ? 'border-navy-800' : 'border-gray-200'}`}
+                className={`mb-2 rounded-xl border overflow-hidden ${session.currentContextId === item.id ? 'border-brand-600' : 'border-border'}`}
                 onPress={() => handleChangeContext(item)}
               >
                 {item.reference_image_uri ? (
@@ -372,13 +374,13 @@ export default function ActiveSessionScreen() {
                     resizeMode="cover"
                   />
                 ) : null}
-                <View className={`flex-row items-center px-4 py-3 ${session.currentContextId === item.id ? 'bg-navy-50' : 'bg-white'}`}>
+                <View className={`flex-row items-center px-4 py-3 ${session.currentContextId === item.id ? 'bg-brand-50' : 'bg-white'}`}>
                   <Text className="text-xl mr-3">{item.icon}</Text>
-                  <Text className={`flex-1 font-medium ${session.currentContextId === item.id ? 'text-navy-800' : 'text-gray-800'}`}>
+                  <Text className={`flex-1 font-medium ${session.currentContextId === item.id ? 'text-text-primary' : 'text-text-primary'}`}>
                     {item.name}
                   </Text>
                   {session.currentContextId === item.id && (
-                    <Ionicons name="checkmark-circle" size={22} color="#1E3A5F" />
+                    <Ionicons name="checkmark-circle" size={22} color="#3B5BDB" />
                   )}
                 </View>
               </TouchableOpacity>

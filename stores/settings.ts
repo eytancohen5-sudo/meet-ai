@@ -21,7 +21,7 @@ export const useSettings = create<SettingsState>((set) => ({
       getSetting('owner_name'),
     ]);
     set({
-      anthropicApiKey: apiKey ?? '',
+      anthropicApiKey: apiKey ?? process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '',
       ownerName: ownerName ?? 'Owner',
       isLoaded: true,
     });

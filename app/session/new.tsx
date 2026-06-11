@@ -86,9 +86,9 @@ export default function NewSessionScreen() {
   if (Platform.OS === 'web') {
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center p-8">
-        <Ionicons name="phone-portrait-outline" size={48} color="#D9E2EC" />
-        <Text className="text-navy-800 font-semibold text-lg mt-4">Mobile app required</Text>
-        <Text className="text-gray-400 text-sm mt-2 text-center">
+        <Ionicons name="phone-portrait-outline" size={48} color="#E5E7EB" />
+        <Text className="text-text-primary font-semibold text-lg mt-4">Mobile app required</Text>
+        <Text className="text-text-secondary text-sm mt-2 text-center">
           Recording is only available in the Meet AI mobile app.
         </Text>
       </SafeAreaView>
@@ -98,11 +98,11 @@ export default function NewSessionScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       {/* Header */}
-      <View className="flex-row items-center px-5 pt-4 pb-4 border-b border-gray-100">
+      <View className="flex-row items-center px-5 pt-4 pb-4 border-b border-border">
         <TouchableOpacity onPress={() => router.back()} className="mr-3" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="close" size={24} color="#1E3A5F" />
+          <Ionicons name="close" size={24} color="#3B5BDB" />
         </TouchableOpacity>
-        <Text className="text-navy-800 text-lg font-bold flex-1">New Session</Text>
+        <Text className="text-text-primary text-lg font-bold flex-1">New Session</Text>
       </View>
 
       <ScrollView
@@ -110,25 +110,25 @@ export default function NewSessionScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Context */}
-        <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-3">Starting Context</Text>
+        <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">Starting Context</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
           <TouchableOpacity
-            className={`mr-2 px-4 py-3 rounded-xl border flex-row items-center gap-2 ${!selectedContext ? 'bg-navy-800 border-navy-800' : 'bg-white border-gray-200'}`}
+            className={`mr-2 px-4 py-3 rounded-xl border flex-row items-center gap-2 ${!selectedContext ? 'bg-brand-600 border-brand-600' : 'bg-white border-border'}`}
             onPress={() => setSelectedContext(null)}
           >
-            <Ionicons name="help-outline" size={16} color={!selectedContext ? 'white' : '#6b7280'} />
-            <Text className={`text-sm font-medium ${!selectedContext ? 'text-white' : 'text-gray-500'}`}>
+            <Ionicons name="help-outline" size={16} color={!selectedContext ? 'white' : '#6B7280'} />
+            <Text className={`text-sm font-medium ${!selectedContext ? 'text-white' : 'text-text-secondary'}`}>
               Ask me
             </Text>
           </TouchableOpacity>
           {contexts.map(ctx => (
             <TouchableOpacity
               key={ctx.id}
-              className={`mr-2 px-4 py-3 rounded-xl border flex-row items-center gap-2 ${selectedContext?.id === ctx.id ? 'border-navy-800 bg-navy-50' : 'bg-white border-gray-200'}`}
+              className={`mr-2 px-4 py-3 rounded-xl border flex-row items-center gap-2 ${selectedContext?.id === ctx.id ? 'border-brand-600 bg-brand-50' : 'bg-white border-border'}`}
               onPress={() => setSelectedContext(ctx)}
             >
               <Text className="text-base">{ctx.icon}</Text>
-              <Text className={`text-sm font-medium ${selectedContext?.id === ctx.id ? 'text-navy-800' : 'text-gray-700'}`}>
+              <Text className={`text-sm font-medium ${selectedContext?.id === ctx.id ? 'text-text-primary' : 'text-text-secondary'}`}>
                 {ctx.name}
               </Text>
             </TouchableOpacity>
@@ -136,13 +136,13 @@ export default function NewSessionScreen() {
         </ScrollView>
 
         {/* Staff */}
-        <Text className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-3">
+        <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
           Who's with you?
         </Text>
         {staff.length === 0 ? (
-          <View className="bg-gray-50 rounded-xl p-4 mb-6 flex-row items-center gap-3">
-            <Ionicons name="person-add-outline" size={20} color="#9ca3af" />
-            <Text className="text-gray-400 text-sm flex-1">
+          <View className="bg-bg rounded-xl p-4 mb-6 flex-row items-center gap-3">
+            <Ionicons name="person-add-outline" size={20} color="#6B7280" />
+            <Text className="text-text-secondary text-sm flex-1">
               No team members added yet. Head to the Team tab to add people.
             </Text>
           </View>
@@ -153,7 +153,7 @@ export default function NewSessionScreen() {
               return (
                 <TouchableOpacity
                   key={member.id}
-                  className={`flex-row items-center p-3.5 mb-2 rounded-xl border ${selected ? 'border-navy-800 bg-navy-50' : 'border-gray-200 bg-white'}`}
+                  className={`flex-row items-center p-3.5 mb-2 rounded-xl border ${selected ? 'border-brand-600 bg-brand-50' : 'border-border bg-white'}`}
                   onPress={() => toggleStaff(member.id)}
                 >
                   <View
@@ -165,15 +165,15 @@ export default function NewSessionScreen() {
                     </Text>
                   </View>
                   <View className="flex-1">
-                    <Text className={`font-medium text-sm ${selected ? 'text-navy-800' : 'text-gray-800'}`}>
+                    <Text className={`font-medium text-sm ${selected ? 'text-text-primary' : 'text-text-primary'}`}>
                       {member.name}
                     </Text>
                     {member.role ? (
-                      <Text className="text-gray-400 text-xs mt-0.5">{member.role}</Text>
+                      <Text className="text-text-secondary text-xs mt-0.5">{member.role}</Text>
                     ) : null}
                   </View>
                   {selected && (
-                    <Ionicons name="checkmark-circle" size={22} color="#1E3A5F" />
+                    <Ionicons name="checkmark-circle" size={22} color="#3B5BDB" />
                   )}
                 </TouchableOpacity>
               );
@@ -186,14 +186,14 @@ export default function NewSessionScreen() {
           className="flex-row items-center gap-2 mb-3"
           onPress={() => setShowTitle(v => !v)}
         >
-          <Ionicons name={showTitle ? 'chevron-down' : 'chevron-forward'} size={14} color="#9ca3af" />
-          <Text className="text-gray-400 text-xs font-semibold uppercase tracking-wide">
+          <Ionicons name={showTitle ? 'chevron-down' : 'chevron-forward'} size={14} color="#6B7280" />
+          <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
             {showTitle ? 'Session Title' : `Title: ${title}`}
           </Text>
         </TouchableOpacity>
         {showTitle && (
           <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-800 text-base mb-4"
+            className="bg-bg border border-border rounded-xl px-4 py-3.5 text-text-primary text-base mb-4"
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. Monday Check-in"
@@ -211,7 +211,7 @@ export default function NewSessionScreen() {
       </ScrollView>
 
       {/* Start Button */}
-      <View className="absolute bottom-0 left-0 right-0 px-5 pb-10 pt-4 bg-white border-t border-gray-100">
+      <View className="absolute bottom-0 left-0 right-0 px-5 pb-10 pt-4 bg-white border-t border-border">
         <TouchableOpacity
           className={`py-4 rounded-2xl items-center flex-row justify-center gap-2 ${starting ? 'bg-gray-400' : 'bg-red-500'}`}
           onPress={handleStart}

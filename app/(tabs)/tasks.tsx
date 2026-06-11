@@ -36,32 +36,32 @@ export default function TasksScreen() {
   }, {});
 
   return (
-    <SafeAreaView className="flex-1 bg-navy-800">
+    <SafeAreaView className="flex-1 bg-bg">
       <View className="px-5 pt-4 pb-5">
-        <Text className="text-white text-2xl font-bold tracking-tight">Open Tasks</Text>
-        <Text className="text-navy-400 text-sm mt-1">
+        <Text className="text-text-primary text-2xl font-bold tracking-tight">Open Tasks</Text>
+        <Text className="text-text-secondary text-sm mt-1">
           {tasks.length} task{tasks.length !== 1 ? 's' : ''} pending
         </Text>
       </View>
 
-      <View className="flex-1 bg-app-bg rounded-t-3xl">
+      <View className="flex-1 bg-bg">
         <ScrollView
           contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 16, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1E3A5F" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B5BDB" />}
           showsVerticalScrollIndicator={false}
         >
           {tasks.length === 0 ? (
             <View className="items-center py-16">
-              <Ionicons name="checkmark-done-circle-outline" size={56} color="#D9E2EC" />
-              <Text className="text-navy-800 font-semibold text-lg mt-4">All caught up!</Text>
-              <Text className="text-navy-400 text-sm mt-2 text-center px-8">
+              <Ionicons name="checkmark-done-circle-outline" size={56} color="#E5E7EB" />
+              <Text className="text-text-primary font-semibold text-lg mt-4">All caught up!</Text>
+              <Text className="text-text-secondary text-sm mt-2 text-center px-8">
                 No open tasks. Complete sessions will appear here.
               </Text>
             </View>
           ) : (
             Object.entries(grouped).map(([sessionTitle, sessionTasks]) => (
               <View key={sessionTitle} className="mb-5">
-                <Text className="text-navy-400 text-xs font-semibold uppercase tracking-wide mb-2">
+                <Text className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-2">
                   {sessionTitle}
                 </Text>
                 {sessionTasks.map(task => (
