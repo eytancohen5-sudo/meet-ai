@@ -4,6 +4,7 @@ import {
   Alert, RefreshControl, TextInput, ActivityIndicator, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import Anthropic from '@anthropic-ai/sdk';
@@ -66,29 +67,29 @@ export default function SessionsScreen() {
     setRefreshing(false);
   };
 
-  const handleLongPress = (session: Session) => {
+  // Swipe-left Delete (Screen 1): ONE confirmation with the item named —
+  // "deletes confirm once" (design principle 5). The long-press path with two
+  // stacked Alerts is removed (kill list); Review's overflow menu stays the
+  // discoverable delete, this swipe is the accelerator.
+  const confirmDelete = (session: Session, swipeable: SwipeableMethods) => {
     Alert.alert(
-      session.title,
-      'What would you like to do?',
+      `Delete "${session.title}"?`,
+      'Transcript, tasks and audio go with it.',
       [
+        { text: 'Cancel', style: 'cancel', onPress: () => swipeable.close() },
         {
-          text: 'Delete Session',
+          text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Delete Session', 'This cannot be undone.', [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: async () => {
-                  await deleteSession(session.id);
-                  await load();
-                },
-              },
-            ]);
+          onPress: async () => {
+            try {
+              await deleteSession(session.id);
+              await load();
+            } catch (err) {
+              console.error('Failed to delete session:', err);
+              swipeable.close();
+            }
           },
         },
-        { text: 'Cancel', style: 'cancel' },
       ]
     );
   };
@@ -323,18 +324,40 @@ export default function SessionsScreen() {
                     Recent
                   </Text>
                   {pastSessions.map(session => (
-                    <SessionCard
+                    // Swipe-left reveals a visible red Delete button (Screen 1:
+                    // never full-swipe auto-delete). ReanimatedSwipeable rides
+                    // the installed gesture-handler 2.31 + reanimated 4.3 —
+                    // no new deps (challenger-verified in the blueprint).
+                    <ReanimatedSwipeable
                       key={session.id}
-                      session={session}
-                      // Interrupted sessions open the read-only recovery layout —
-                      // never Review (its guards land in T8) and never live capture.
-                      onPress={() => router.push(
-                        session.status === 'interrupted'
-                          ? `/session/${session.id}`
-                          : `/review/${session.id}`
+                      friction={2}
+                      rightThreshold={36}
+                      overshootRight={false}
+                      renderRightActions={(_progress, _translation, methods) => (
+                        // mb-3 mirrors the card's own bottom margin so the
+                        // button aligns with the card face, not the gap.
+                        <View className="mb-3 pl-2">
+                          <TouchableOpacity
+                            className="flex-1 w-20 bg-recording rounded-2xl items-center justify-center"
+                            onPress={() => confirmDelete(session, methods)}
+                          >
+                            <Ionicons name="trash-outline" size={20} color="white" />
+                            <Text className="text-white text-xs font-semibold mt-1">Delete</Text>
+                          </TouchableOpacity>
+                        </View>
                       )}
-                      onLongPress={() => handleLongPress(session)}
-                    />
+                    >
+                      <SessionCard
+                        session={session}
+                        // Interrupted sessions open the read-only recovery layout —
+                        // never Review (its guards land in T8) and never live capture.
+                        onPress={() => router.push(
+                          session.status === 'interrupted'
+                            ? `/session/${session.id}`
+                            : `/review/${session.id}`
+                        )}
+                      />
+                    </ReanimatedSwipeable>
                   ))}
                 </>
               )}

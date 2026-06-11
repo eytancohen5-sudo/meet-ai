@@ -73,9 +73,15 @@ export default function RootLayout() {
             sheetCornerRadius: 24,
           }}
         />
+        {/* gestureEnabled:false (R4): the live capture screen must never be
+            leavable via the iOS back-swipe — unmount releases the recorder, and
+            remounting from the Home banner would re-init capture over the
+            session's audio (the ADR-008 overwrite class). The live layout has
+            its own exits (Stop sheet, fatal-error End); the read-only
+            recovery/pending layouts re-enable the gesture inline. */}
         <Stack.Screen
           name="session/[id]"
-          options={{ headerShown: false }}
+          options={{ headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen
           name="review/[id]"

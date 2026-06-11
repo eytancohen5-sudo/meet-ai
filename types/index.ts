@@ -77,6 +77,20 @@ export interface Task {
   created_at: number;
 }
 
+// R2: update payload for updateTask. For the nullable columns (assigned_to,
+// due_date, notes) `null` means "write SQL NULL" (clear the field) while
+// undefined/absent means "leave unchanged" — Partial<Task> could not express
+// NULL, which forced a non-atomic deleteTask+addTask rewrite at the Tasks tab
+// edit sheet. Scope matches build-spec T1: assignee / due date / priority /
+// status / notes only.
+export type TaskUpdate = {
+  assigned_to?: string | null;
+  due_date?: number | null;
+  notes?: string | null;
+  priority?: Task['priority'];
+  status?: Task['status'];
+};
+
 export interface Idea {
   id: string;
   session_id: string;

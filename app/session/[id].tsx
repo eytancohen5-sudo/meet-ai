@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { useActiveSession } from '../../stores/session';
@@ -56,6 +56,16 @@ function fatalErrorMessage(code: string): string {
 // else resolves to the read-only recovery layout (or a redirect). There is no
 // transition from any other mode into 'live'.
 type ScreenMode = 'pending' | 'live' | 'recovery';
+
+// R4 remount guard: session ids whose capture pipeline already started in this
+// JS process. The live screen is single-instance by design (back-swipe disabled
+// in app/_layout.tsx), but if a live screen ever remounts anyway, the recorder
+// init must not run twice — a second prepareToRecordAsync()/record() would
+// spawn a new audio file, reset the transcript timing clock, and overwrite
+// audio_uri (the exact ADR-008 overwrite class). Module scope survives
+// remounts; after a process death the in-memory store is empty too, so 'live'
+// mode is unreachable and this set being empty is correct.
+const startedCaptureIds = new Set<string>();
 
 export default function ActiveSessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -230,27 +240,36 @@ export default function ActiveSessionScreen() {
       // Start speech recognition
       startListening();
 
-      // Start audio recording
-      setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
-        .then(() => recorder.prepareToRecordAsync())
-        .then(() => recorder.record())
-        .then(() => {
-          markRecordingStart();
-          // Re-anchor: startListening() above snapshotted getRecordingElapsed()
-          // BEFORE markRecordingStart() reset the module-scope clock, so for any
-          // session after the first it held the PREVIOUS session's elapsed time.
-          // Recording starts now, so this recognition cycle began at 0s.
-          recognitionStartElapsed.current = 0;
-          // ADR-008 amendment 2 (best-effort, non-binding): persist the recorder's
-          // temp URI at record-start so audio of a force-killed session has a
-          // salvage chance. finishSession overwrites it with the saved Documents
-          // path; if the recorder hasn't exposed a uri yet, this is a no-op.
-          const tempUri = recorder.uri;
-          if (tempUri) {
-            updateSession(id, { audio_uri: tempUri }).catch(() => {});
-          }
-        })
-        .catch(console.error);
+      // R4: recorder init runs at most once per live session id per process —
+      // on a remount (no known path while back-swipe is disabled, but guarded
+      // regardless) speech recognition resumes on the original timing clock and
+      // the audio init below is skipped entirely: no new audio file, no clock
+      // reset, no audio_uri overwrite.
+      if (!startedCaptureIds.has(id)) {
+        startedCaptureIds.add(id);
+
+        // Start audio recording
+        setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
+          .then(() => recorder.prepareToRecordAsync())
+          .then(() => recorder.record())
+          .then(() => {
+            markRecordingStart();
+            // Re-anchor: startListening() above snapshotted getRecordingElapsed()
+            // BEFORE markRecordingStart() reset the module-scope clock, so for any
+            // session after the first it held the PREVIOUS session's elapsed time.
+            // Recording starts now, so this recognition cycle began at 0s.
+            recognitionStartElapsed.current = 0;
+            // ADR-008 amendment 2 (best-effort, non-binding): persist the recorder's
+            // temp URI at record-start so audio of a force-killed session has a
+            // salvage chance. finishSession overwrites it with the saved Documents
+            // path; if the recorder hasn't exposed a uri yet, this is a no-op.
+            const tempUri = recorder.uri;
+            if (tempUri) {
+              updateSession(id, { audio_uri: tempUri }).catch(() => {});
+            }
+          })
+          .catch(console.error);
+      }
 
       // Elapsed timer
       elapsedRef.current = setInterval(() => {
@@ -474,6 +493,9 @@ export default function ActiveSessionScreen() {
 
     return (
       <SafeAreaView className="flex-1 bg-bg">
+        {/* Read-only layout: re-enable the back-swipe that _layout.tsx disables
+            for the live capture path (R4). No recorder exists here to protect. */}
+        <Stack.Screen options={{ gestureEnabled: true }} />
         <StatusBar style="dark" />
         <View className="bg-surface border-b border-border px-5 pt-3 pb-4">
           <View className="flex-row items-center gap-2">
@@ -534,6 +556,8 @@ export default function ActiveSessionScreen() {
   if (mode === 'pending') {
     return (
       <SafeAreaView className="flex-1 bg-bg items-center justify-center">
+        {/* Non-live (resolving/recovery-bound) — back-swipe allowed (R4). */}
+        <Stack.Screen options={{ gestureEnabled: true }} />
         <StatusBar style="dark" />
         {loadError ? (
           <View className="w-full px-6">

@@ -4,10 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Session } from '../types';
 import { formatDuration } from '../lib/transcription';
 
+// Long-press prop removed (Screen 1 kill list): delete is the Home swipe-left
+// row or Review's overflow menu — never a hidden long-press path.
 interface Props {
   session: Session;
   onPress: () => void;
-  onLongPress?: () => void;
 }
 
 const STATUS_CONFIG = {
@@ -20,7 +21,7 @@ const STATUS_CONFIG = {
   interrupted: { label: 'Interrupted', color: '#D97706', icon: 'alert-circle' as const },
 };
 
-export function SessionCard({ session, onPress, onLongPress }: Props) {
+export function SessionCard({ session, onPress }: Props) {
   const status = STATUS_CONFIG[session.status] ?? STATUS_CONFIG.complete;
   const duration = session.ended_at
     ? formatDuration((session.ended_at - session.started_at) / 1000)
@@ -32,7 +33,6 @@ export function SessionCard({ session, onPress, onLongPress }: Props) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      onLongPress={onLongPress}
       className="bg-white rounded-2xl p-4 mb-3 shadow-sm border border-border"
       activeOpacity={0.7}
     >

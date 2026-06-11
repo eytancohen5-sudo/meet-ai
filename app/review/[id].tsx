@@ -123,7 +123,10 @@ export default function ReviewScreen() {
     try {
       const [locs, staff] = await Promise.all([getContexts(), getStaff()]);
       const apiKey = apiKeyOverride ?? anthropicApiKey;
-      const result = await organizeSession(lines, staff, locs, sess.title, apiKey || undefined);
+      // sess.started_at anchors relative due dates ("by Friday") to the session
+      // date (ADR-007 contract v2, amendment 5) — without it the organizer falls
+      // back to transcript[0]?.timestamp, which mis-anchors sessions crossing midnight.
+      const result = await organizeSession(lines, staff, locs, sess.title, apiKey || undefined, sess.started_at);
 
       // Save organized data
       const now = Date.now();

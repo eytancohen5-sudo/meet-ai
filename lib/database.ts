@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Session, TranscriptLine, Task, Idea, Issue, Decision, MediaItem, Context, StaffMember } from '../types';
+import { Session, TranscriptLine, Task, TaskUpdate, Idea, Issue, Decision, MediaItem, Context, StaffMember } from '../types';
 
 // T6 cold-start hardening: cache the PROMISE, not the resolved handle, so that
 // concurrent first callers share a single open+migrate run instead of racing
@@ -419,7 +419,12 @@ export async function updateTaskStatus(id: string, status: 'open' | 'done'): Pro
 }
 
 // T1: partial task update — assignee / due date / priority / status / notes (build-spec scope).
-export async function updateTask(id: string, updates: Partial<Task>): Promise<void> {
+// R2 (gate rework): widened from Partial<Task> to TaskUpdate so callers can pass
+// `null` to clear assigned_to / due_date / notes (SQL NULL). undefined still means
+// "leave unchanged". The runtime below already mapped null via `?? null`; only the
+// type was too narrow, which had forced a non-atomic delete+re-add workaround in
+// the Tasks tab edit sheet. No schema change — user_version stays 3.
+export async function updateTask(id: string, updates: TaskUpdate): Promise<void> {
   const db = await getDb();
   const fields: string[] = [];
   const values: (string | number | null)[] = [];
