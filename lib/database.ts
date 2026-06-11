@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Session, TranscriptLine, Task, Idea, Issue, Decision, MediaItem, Context, StaffMember } from '../types';
 
 // T6 cold-start hardening: cache the PROMISE, not the resolved handle, so that
@@ -236,6 +237,27 @@ export async function updateSession(id: string, updates: Partial<Session>): Prom
   await db.runAsync(`UPDATE sessions SET ${fields.join(', ')} WHERE id = ?`, ...values);
 }
 
+// ADR-008 launch auto-close (T1, challenger amendment 1): any session still marked
+// 'recording'/'paused' whose id is not the live in-memory store's sessionId is a corpse
+// from a killed process — reclassify to 'interrupted' BEFORE any UI can treat it as live.
+// ended_at = last persisted transcript line timestamp, or started_at if none.
+// 'interrupted' is a plain TEXT status value — code only, no migration, user_version stays 3.
+export async function markInterruptedSessions(liveSessionId: string | null): Promise<void> {
+  const db = await getDb();
+  // NULL never matches `id != ?` in SQL, which would silently no-op the auto-close when
+  // there is no live session — coalesce to '' (no session id is ever the empty string).
+  await db.runAsync(
+    `UPDATE sessions SET
+       status = 'interrupted',
+       ended_at = COALESCE(
+         (SELECT MAX(tl.timestamp) FROM transcript_lines tl WHERE tl.session_id = sessions.id),
+         started_at
+       )
+     WHERE status IN ('recording', 'paused') AND id != ?`,
+    liveSessionId ?? ''
+  );
+}
+
 export async function getSessions(): Promise<Session[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<{
@@ -311,6 +333,13 @@ export async function deleteSession(id: string): Promise<void> {
   await db.runAsync('DELETE FROM issues WHERE session_id = ?', id);
   await db.runAsync('DELETE FROM decisions WHERE session_id = ?', id);
   await db.runAsync('DELETE FROM media_items WHERE session_id = ?', id);
+  // T1 / challenger amendment 11 (orphaned audio leak): remove the session's recorded
+  // audio at the fixed write path used by lib/transcription.ts. idempotent: true —
+  // no throw if the file never existed. Best-effort: a file-system failure must not
+  // surface to the caller after the DB rows are already gone.
+  try {
+    await FileSystem.deleteAsync(`${FileSystem.documentDirectory}sessions/${id}.m4a`, { idempotent: true });
+  } catch {}
 }
 
 // ── Participants ───────────────────────────────────────────────────────────────
@@ -389,6 +418,39 @@ export async function updateTaskStatus(id: string, status: 'open' | 'done'): Pro
   await db.runAsync('UPDATE tasks SET status = ? WHERE id = ?', status, id);
 }
 
+// T1: partial task update — assignee / due date / priority / status / notes (build-spec scope).
+export async function updateTask(id: string, updates: Partial<Task>): Promise<void> {
+  const db = await getDb();
+  const fields: string[] = [];
+  const values: (string | number | null)[] = [];
+  if (updates.assigned_to !== undefined) { fields.push('assigned_to = ?'); values.push(updates.assigned_to ?? null); }
+  if (updates.due_date !== undefined) { fields.push('due_date = ?'); values.push(updates.due_date ?? null); }
+  if (updates.priority !== undefined) { fields.push('priority = ?'); values.push(updates.priority); }
+  if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
+  if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes ?? null); }
+  if (fields.length === 0) return;
+  values.push(id);
+  await db.runAsync(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`, ...values);
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM tasks WHERE id = ?', id);
+}
+
+// T1: all tasks across sessions INCLUDING done — Tasks tab Done segment + person grouping.
+export async function getAllTasks(): Promise<(Task & { session_title: string })[]> {
+  const db = await getDb();
+  return db.getAllAsync<Task & { session_title: string; assigned_to_name: string | null; location_name: string | null }>(
+    `SELECT t.*, s.title as session_title, st.name as assigned_to_name, l.name as location_name
+     FROM tasks t
+     JOIN sessions s ON t.session_id = s.id
+     LEFT JOIN staff st ON t.assigned_to = st.id
+     LEFT JOIN contexts l ON t.location_id = l.id
+     ORDER BY t.created_at DESC`
+  );
+}
+
 export async function getAllOpenTasks(): Promise<(Task & { session_title: string })[]> {
   const db = await getDb();
   return db.getAllAsync<Task & { session_title: string; assigned_to_name: string | null; location_name: string | null }>(
@@ -442,6 +504,25 @@ export async function getIssues(sessionId: string): Promise<Issue[]> {
      WHERE i.session_id = ? ORDER BY i.created_at ASC`, sessionId
   );
   return rows.map(r => ({ ...r, location_name: r.location_name ?? undefined }));
+}
+
+// T1: open issues across sessions with session title (R8-minimal Issues surface).
+export async function getAllOpenIssues(): Promise<(Issue & { session_title: string })[]> {
+  const db = await getDb();
+  return db.getAllAsync<Issue & { session_title: string; location_name: string | null }>(
+    `SELECT i.*, s.title as session_title, l.name as location_name
+     FROM issues i
+     JOIN sessions s ON i.session_id = s.id
+     LEFT JOIN contexts l ON i.location_id = l.id
+     WHERE i.status = 'open'
+     ORDER BY i.created_at DESC`
+  );
+}
+
+// T1: resolve action for the Issues surface.
+export async function updateIssueStatus(id: string, status: 'open' | 'resolved'): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('UPDATE issues SET status = ? WHERE id = ?', status, id);
 }
 
 // ── Decisions ─────────────────────────────────────────────────────────────────

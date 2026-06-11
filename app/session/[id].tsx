@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Alert, Modal, FlatList, Image, Platform,
+  ActionSheetIOS, ActivityIndicator, Alert, Modal, FlatList, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -12,6 +12,7 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 import { useActiveSession } from '../../stores/session';
 import {
   addTranscriptLine, addMediaItem, updateSession, getContexts, getStaff, getSession,
+  getTranscriptLines, deleteSession, markInterruptedSessions, upsertContext,
 } from '../../lib/database';
 import { saveAudioToDocuments, formatDuration, getRecordingElapsed, markRecordingStart, markPauseStart, markResumed } from '../../lib/transcription';
 import {
@@ -20,7 +21,8 @@ import {
   RecordingPresets,
 } from 'expo-audio';
 import { TranscriptLineView } from '../../components/TranscriptLine';
-import { TranscriptLine, Context, StaffMember } from '../../types';
+import { NoticeBanner } from '../../components/NoticeBanner';
+import { TranscriptLine, Context, StaffMember, Session } from '../../types';
 import { nanoid } from '../_utils';
 
 // Deterministic failures — retrying the same start options can never succeed.
@@ -49,6 +51,12 @@ function fatalErrorMessage(code: string): string {
   }
 }
 
+// ADR-008 §3: the screen has exactly two layouts. 'live' may only be entered
+// when the in-memory store confirms this id is the live recording; everything
+// else resolves to the read-only recovery layout (or a redirect). There is no
+// transition from any other mode into 'live'.
+type ScreenMode = 'pending' | 'live' | 'recovery';
+
 export default function ActiveSessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const session = useActiveSession();
@@ -58,10 +66,17 @@ export default function ActiveSessionScreen() {
   const [contexts, setContexts] = useState<Context[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [showContextPicker, setShowContextPicker] = useState(false);
-  const [activeSpeakerId, setActiveSpeakerId] = useState<string>('me');
   const [pendingText, setPendingText] = useState('');
   const [isStopping, setIsStopping] = useState(false);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
+  // Liveness is decided exactly once, at mount, from the in-memory store —
+  // the persisted status is never consulted for the live path (ADR-008).
+  const [mode, setMode] = useState<ScreenMode>(() =>
+    useActiveSession.getState().isLiveSession(id) ? 'live' : 'pending'
+  );
+  const [recoverySession, setRecoverySession] = useState<Session | null>(null);
+  const [recoveryLines, setRecoveryLines] = useState<TranscriptLine[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   // Speech recognition lifecycle — refs (not async state) so the stop/pause/error
   // races inside native event callbacks see the truth synchronously.
@@ -73,6 +88,10 @@ export default function ActiveSessionScreen() {
   const transientRestartsRef = useRef(0);
 
   useSpeechRecognitionEvent('result', (event) => {
+    // Recognition events are module-level: a non-live screen (recovery/pending)
+    // must never persist lines under its session id from a stray recognition
+    // session that is still winding down (ADR-008 — no writes for non-live).
+    if (mode !== 'live') return;
     const text = event.results?.[0]?.transcript ?? '';
     if (text.trim()) {
       // The recognizer is demonstrably healthy — reset the transient failure budget.
@@ -83,12 +102,14 @@ export default function ActiveSessionScreen() {
       // file timeline, so review tap-to-play can seekTo(start_time) directly.
       const startTime = recognitionStartElapsed.current;
       const endTime = Math.max(getRecordingElapsed(), startTime);
+      // All lines record as the session's voice (speaker chips removed, ADR-007):
+      // the organize step assigns people from names spoken aloud.
       const line: TranscriptLine = {
         id: nanoid(),
         session_id: id,
-        speaker_id: activeSpeakerId,
-        speaker_name: activeSpeakerId === 'me' ? 'You' : (staff.find(s => s.id === activeSpeakerId)?.name ?? activeSpeakerId),
-        speaker_color: activeSpeakerId === 'me' ? '#3B5BDB' : (staff.find(s => s.id === activeSpeakerId)?.color ?? '#6b7280'),
+        speaker_id: 'me',
+        speaker_name: 'You',
+        speaker_color: '#3B5BDB',
         text: text.trim(),
         start_time: startTime,
         end_time: endTime,
@@ -116,6 +137,8 @@ export default function ActiveSessionScreen() {
   });
 
   useSpeechRecognitionEvent('error', (event) => {
+    // Non-live screens never manage (or restart) recognition.
+    if (mode !== 'live') return;
     if (event.error === 'aborted') {
       // Fired by our own stop()/abort() — never blanket-restart on it.
       // The 'end' handler decides, gated by the paused/stopping/fatal refs.
@@ -153,6 +176,8 @@ export default function ActiveSessionScreen() {
   });
 
   useSpeechRecognitionEvent('end', () => {
+    // Non-live screens never manage (or restart) recognition.
+    if (mode !== 'live') return;
     if (stoppingRef.current || pausedRef.current || fatalRef.current) return;
     if (!useActiveSession.getState().isRecording) return;
     scheduleRestart(0);
@@ -197,25 +222,11 @@ export default function ActiveSessionScreen() {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
-      // T11-3 guard: this screen auto-starts capture on mount, so deep-linking
-      // meetai://session/<id> for a finished session would re-record it and
-      // overwrite its .m4a. Check the persisted status BEFORE touching the
-      // recorder — finished sessions belong on the review screen.
-      try {
-        const existing = await getSession(id);
-        if (cancelled) return;
-        if (existing && (existing.status === 'complete' || existing.status === 'processing')) {
-          router.replace(`/review/${id}`);
-          return;
-        }
-      } catch (err) {
-        // Status unreadable (cold-start DB hiccup): fall through and record —
-        // blocking a legitimate new session is worse than the rare re-check.
-        console.error('Failed to read session status before recording:', err);
-        if (cancelled) return;
-      }
-
+    // ADR-008 mount guard: live capture may start ONLY when the in-memory store
+    // confirms this id is the live recording. A persisted 'recording' status is
+    // never trusted — after a process death it is a corpse, and re-entering the
+    // capture path would re-record over its audio (the verified footgun).
+    if (mode === 'live') {
       // Start speech recognition
       startListening();
 
@@ -230,6 +241,14 @@ export default function ActiveSessionScreen() {
           // session after the first it held the PREVIOUS session's elapsed time.
           // Recording starts now, so this recognition cycle began at 0s.
           recognitionStartElapsed.current = 0;
+          // ADR-008 amendment 2 (best-effort, non-binding): persist the recorder's
+          // temp URI at record-start so audio of a force-killed session has a
+          // salvage chance. finishSession overwrites it with the saved Documents
+          // path; if the recorder hasn't exposed a uri yet, this is a no-op.
+          const tempUri = recorder.uri;
+          if (tempUri) {
+            updateSession(id, { audio_uri: tempUri }).catch(() => {});
+          }
         })
         .catch(console.error);
 
@@ -237,7 +256,42 @@ export default function ActiveSessionScreen() {
       elapsedRef.current = setInterval(() => {
         setElapsed(getRecordingElapsed());
       }, 1000);
-    })();
+    } else {
+      // Non-live: the recorder is NEVER touched on this path. Decide between
+      // redirect (finished sessions) and the read-only recovery layout.
+      (async () => {
+        try {
+          let existing = await getSession(id);
+          if (cancelled) return;
+          if (!existing) {
+            router.replace('/(tabs)');
+            return;
+          }
+          if (existing.status === 'complete' || existing.status === 'processing') {
+            // Finished sessions belong on the review screen (deep-link guard).
+            router.replace(`/review/${id}`);
+            return;
+          }
+          if (existing.status === 'recording' || existing.status === 'paused') {
+            // Corpse reached before Home's launch sweep ran (e.g. deep link):
+            // launch auto-close wins (ADR-008 §2) — reclassify, then recover.
+            await markInterruptedSessions(useActiveSession.getState().sessionId);
+            existing = (await getSession(id)) ?? existing;
+            if (cancelled) return;
+          }
+          const lines = await getTranscriptLines(id);
+          if (cancelled) return;
+          setRecoverySession(existing);
+          setRecoveryLines(lines);
+          setMode('recovery');
+        } catch (err) {
+          // Status unreadable: recording for a non-live session is never an
+          // option, so surface the failure instead of falling through.
+          console.error('Failed to load session for recovery:', err);
+          if (!cancelled) setLoadError("Couldn't load this session. Go back and try again.");
+        }
+      })();
+    }
 
     return () => {
       cancelled = true;
@@ -303,14 +357,16 @@ export default function ActiveSessionScreen() {
     }
   };
 
+  // Stop → native action sheet, not Alert (02-screen-designs, Recording screen).
   const handleStop = () => {
-    Alert.alert(
-      'End Session',
-      'Stop recording and save the session?',
-      [
-        { text: 'Keep Recording', style: 'cancel' },
-        { text: 'End Session', style: 'destructive', onPress: finishSession },
-      ]
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ['End & organize', 'Keep recording'],
+        cancelButtonIndex: 1,
+      },
+      (buttonIndex) => {
+        if (buttonIndex === 0) finishSession();
+      }
     );
   };
 
@@ -318,6 +374,40 @@ export default function ActiveSessionScreen() {
     setShowContextPicker(false);
     session.updateContext(ctx.id, ctx.name);
     await updateSession(id, { context_id: ctx.id });
+  };
+
+  // "+ New place" pinned row — name-only creation with the NOT NULL defaults
+  // (context_type 'space', icon 📍, schema default color — challenger amendment 8).
+  const handleCreatePlace = () => {
+    Alert.prompt(
+      'New place',
+      undefined,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add',
+          onPress: async (name?: string) => {
+            const trimmed = name?.trim();
+            if (!trimmed) return;
+            const ctx: Context = {
+              id: nanoid(),
+              name: trimmed,
+              icon: '📍',
+              color: '#6E8FAC',
+              context_type: 'space',
+            };
+            try {
+              await upsertContext(ctx);
+              setContexts(await getContexts());
+              await handleChangeContext(ctx);
+            } catch (err) {
+              console.error('Failed to create place:', err);
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
   };
 
   const handleCameraPress = async () => {
@@ -337,13 +427,43 @@ export default function ActiveSessionScreen() {
     }
   };
 
-  const currentSpeaker = activeSpeakerId === 'me'
-    ? { name: 'You', color: '#3B5BDB', initials: 'ME' }
-    : staff.find(s => s.id === activeSpeakerId) ? {
-        name: staff.find(s => s.id === activeSpeakerId)!.name,
-        color: staff.find(s => s.id === activeSpeakerId)!.color,
-        initials: staff.find(s => s.id === activeSpeakerId)!.avatar_initials,
-      } : { name: 'Unknown', color: '#6b7280', initials: '?' };
+  // ── Recovery actions (ADR-008 §3) — status-only writes, audio_uri untouched ──
+
+  const handleSaveAndReview = async () => {
+    try {
+      // ended_at was already set honestly by the launch auto-close (last
+      // persisted transcript line). Organize is offered on the review screen.
+      await updateSession(id, { status: 'processing' });
+      router.replace(`/review/${id}`);
+    } catch (err) {
+      console.error('Failed to save interrupted session:', err);
+      Alert.alert("Couldn't save", 'Something went wrong. Please try again.');
+    }
+  };
+
+  const handleDiscard = () => {
+    const title = recoverySession?.title ?? 'this recording';
+    Alert.alert(
+      'Discard recording?',
+      `"${title}" and its transcript will be deleted.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteSession(id);
+              router.replace('/(tabs)');
+            } catch (err) {
+              console.error('Failed to discard session:', err);
+              Alert.alert("Couldn't discard", 'Something went wrong. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   if (Platform.OS === 'web') {
     return (
@@ -357,6 +477,93 @@ export default function ActiveSessionScreen() {
     );
   }
 
+  // ── Recovery layout — static, read-only; no capture path exists here ─────────
+  if (mode === 'recovery') {
+    const endedAt = recoverySession?.ended_at ?? recoverySession?.started_at;
+    const endedAtStr = endedAt
+      ? new Date(endedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      : null;
+
+    return (
+      <SafeAreaView className="flex-1 bg-bg">
+        <StatusBar style="dark" />
+        <View className="bg-surface border-b border-border px-5 pt-3 pb-4">
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="alert-circle" size={20} color="#D97706" />
+            <Text className="text-text-primary font-bold text-lg">Recording interrupted</Text>
+          </View>
+          {recoverySession?.title ? (
+            <Text className="text-text-secondary text-sm mt-1" numberOfLines={1}>
+              {recoverySession.title}
+            </Text>
+          ) : null}
+          <Text className="text-text-tertiary text-xs mt-1">
+            {endedAtStr
+              ? `Everything transcribed up to ${endedAtStr} is saved.`
+              : 'Everything transcribed before the interruption is saved.'}
+          </Text>
+        </View>
+
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {recoveryLines.length === 0 ? (
+            <View className="items-center py-12">
+              <Ionicons name="mic-off-outline" size={40} color="#E5E7EB" />
+              <Text className="text-text-secondary text-sm mt-3 text-center px-8">
+                Nothing was transcribed before the interruption.
+              </Text>
+            </View>
+          ) : (
+            recoveryLines.map(line => (
+              <TranscriptLineView
+                key={line.id}
+                line={line}
+                isOwner={line.speaker_id === 'me'}
+              />
+            ))
+          )}
+        </ScrollView>
+
+        <View className="bg-surface border-t border-border px-5 pt-4 pb-2">
+          <TouchableOpacity
+            className="bg-brand-600 rounded-2xl py-4 items-center"
+            onPress={handleSaveAndReview}
+          >
+            <Text className="text-white font-semibold text-base">Save & review</Text>
+          </TouchableOpacity>
+          <TouchableOpacity className="py-4 items-center" onPress={handleDiscard}>
+            <Text className="text-red-600 font-medium text-sm">Discard</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Pending — resolving a non-live session (spinner, or load failure) ────────
+  if (mode === 'pending') {
+    return (
+      <SafeAreaView className="flex-1 bg-bg items-center justify-center">
+        <StatusBar style="dark" />
+        {loadError ? (
+          <View className="w-full px-6">
+            <NoticeBanner
+              variant="error"
+              message={loadError}
+              actionLabel="Go back"
+              onAction={() => router.replace('/(tabs)')}
+            />
+          </View>
+        ) : (
+          <ActivityIndicator color="#3B5BDB" />
+        )}
+      </SafeAreaView>
+    );
+  }
+
+  // ── Live layout — only reachable when the store confirmed liveness at mount ──
   return (
     <SafeAreaView className="flex-1 bg-gray-950">
       <StatusBar style="light" />
@@ -374,14 +581,14 @@ export default function ActiveSessionScreen() {
           </Text>
         </View>
 
-        {/* Context chip */}
+        {/* Place chip */}
         <TouchableOpacity
           className="flex-row items-center gap-2 bg-white/10 rounded-xl px-3 py-2 self-start"
           onPress={() => setShowContextPicker(true)}
         >
           <Ionicons name="location" size={14} color="#D97706" />
           <Text className="text-white text-sm font-medium">
-            {session.currentContextName ?? 'Where are you?'}
+            {session.currentContextName ?? 'Set place'}
           </Text>
           <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.5)" />
         </TouchableOpacity>
@@ -433,9 +640,9 @@ export default function ActiveSessionScreen() {
                 <View className="mb-3 opacity-50">
                   <View className="flex-row items-center gap-2 mb-1">
                     <View className="w-6 h-6 rounded-full bg-gray-200 items-center justify-center">
-                      <Text className="text-xs font-bold text-text-secondary">{currentSpeaker.initials.charAt(0)}</Text>
+                      <Text className="text-xs font-bold text-text-secondary">Y</Text>
                     </View>
-                    <Text className="text-xs text-text-secondary italic">{currentSpeaker.name} (listening...)</Text>
+                    <Text className="text-xs text-text-secondary italic">Listening…</Text>
                   </View>
                   <View className="ml-8 bg-gray-100 rounded-xl rounded-tl-sm p-3">
                     <Text className="text-text-secondary text-sm italic">{pendingText}</Text>
@@ -448,29 +655,6 @@ export default function ActiveSessionScreen() {
 
         {/* Bottom Controls */}
         <View className="bg-white border-t border-border px-4 pt-3 pb-8">
-          {/* Speaker chips — tap to switch, no modal */}
-          {session.participantIds.length > 0 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingBottom: 8 }}
-            >
-              {[{ id: 'me', name: 'You', color: '#3B5BDB', avatar_initials: 'ME' }, ...staff.filter(s => session.participantIds.includes(s.id))].map(p => (
-                <TouchableOpacity
-                  key={p.id}
-                  onPress={() => setActiveSpeakerId(p.id)}
-                  className={`flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border ${activeSpeakerId === p.id ? 'border-brand-600 bg-brand-50' : 'border-border bg-white'}`}
-                >
-                  <View className="w-5 h-5 rounded-full items-center justify-center" style={{ backgroundColor: p.color + '30' }}>
-                    <Text className="text-xs font-bold" style={{ color: p.color }}>{p.avatar_initials?.charAt(0) ?? '?'}</Text>
-                  </View>
-                  <Text className={`text-xs font-medium ${activeSpeakerId === p.id ? 'text-text-primary' : 'text-text-secondary'}`}>{p.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-
-          {/* Action buttons */}
           <View className="flex-row items-center justify-between">
             <TouchableOpacity
               className="w-12 h-12 bg-gray-100 rounded-full items-center justify-center"
@@ -498,7 +682,7 @@ export default function ActiveSessionScreen() {
         </View>
       </View>
 
-      {/* Context Picker Modal */}
+      {/* Place Picker Modal */}
       <Modal visible={showContextPicker} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView className="flex-1 bg-white">
           <View className="flex-row items-center px-5 pt-4 pb-4 border-b border-border">
@@ -511,27 +695,27 @@ export default function ActiveSessionScreen() {
             data={contexts}
             keyExtractor={item => item.id}
             contentContainerStyle={{ padding: 16 }}
+            ListHeaderComponent={
+              <TouchableOpacity
+                className="mb-2 rounded-xl border border-dashed border-brand-600 bg-brand-50 flex-row items-center px-4 py-3"
+                onPress={handleCreatePlace}
+              >
+                <Ionicons name="add-circle-outline" size={20} color="#3B5BDB" />
+                <Text className="text-brand-600 font-medium ml-2">New place</Text>
+              </TouchableOpacity>
+            }
             renderItem={({ item }) => (
               <TouchableOpacity
-                className={`mb-2 rounded-xl border overflow-hidden ${session.currentContextId === item.id ? 'border-brand-600' : 'border-border'}`}
+                className={`mb-2 rounded-xl border flex-row items-center px-4 py-3 ${session.currentContextId === item.id ? 'border-brand-600 bg-brand-50' : 'border-border bg-white'}`}
                 onPress={() => handleChangeContext(item)}
               >
-                {item.reference_image_uri ? (
-                  <Image
-                    source={{ uri: item.reference_image_uri }}
-                    style={{ width: '100%', height: 80 }}
-                    resizeMode="cover"
-                  />
-                ) : null}
-                <View className={`flex-row items-center px-4 py-3 ${session.currentContextId === item.id ? 'bg-brand-50' : 'bg-white'}`}>
-                  <Text className="text-xl mr-3">{item.icon}</Text>
-                  <Text className={`flex-1 font-medium ${session.currentContextId === item.id ? 'text-text-primary' : 'text-text-primary'}`}>
-                    {item.name}
-                  </Text>
-                  {session.currentContextId === item.id && (
-                    <Ionicons name="checkmark-circle" size={22} color="#3B5BDB" />
-                  )}
-                </View>
+                <Text className="text-xl mr-3">{item.icon}</Text>
+                <Text className="flex-1 font-medium text-text-primary">
+                  {item.name}
+                </Text>
+                {session.currentContextId === item.id && (
+                  <Ionicons name="checkmark-circle" size={22} color="#3B5BDB" />
+                )}
               </TouchableOpacity>
             )}
           />

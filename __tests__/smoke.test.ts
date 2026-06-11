@@ -1,4 +1,5 @@
 // Smoke tests — verify the three highest-risk paths work
+import { test, expect } from '@jest/globals';
 import { organizeSession } from '../lib/organization';
 
 // 1. organizeSession throws (not silently fails) when no API key provided

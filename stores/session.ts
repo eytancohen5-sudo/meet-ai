@@ -13,6 +13,13 @@ interface ActiveSessionState {
 
   startSession: (id: string, contextId: string | null, contextName: string | null, participantIds: string[]) => void;
   stopSession: () => void;
+  /**
+   * ADR-008: THE liveness test. This store is in-memory only (no persistence),
+   * so after a cold start it is empty — a persisted 'recording'/'paused' status
+   * alone can never look live. Live capture and the red Home banner may only
+   * engage when this returns true; everything else is a corpse to recover.
+   */
+  isLiveSession: (id: string) => boolean;
   pauseSession: () => void;
   resumeSession: () => void;
   addTranscriptLine: (line: TranscriptLine) => void;
@@ -21,7 +28,7 @@ interface ActiveSessionState {
   reset: () => void;
 }
 
-export const useActiveSession = create<ActiveSessionState>((set) => ({
+export const useActiveSession = create<ActiveSessionState>((set, get) => ({
   sessionId: null,
   isRecording: false,
   isPaused: false,
@@ -35,6 +42,11 @@ export const useActiveSession = create<ActiveSessionState>((set) => ({
     set({ sessionId: id, isRecording: true, isPaused: false, currentContextId: contextId, currentContextName: contextName, participantIds, transcriptLines: [], elapsedSeconds: 0 }),
 
   stopSession: () => set({ isRecording: false }),
+
+  isLiveSession: (id) => {
+    const s = get();
+    return s.sessionId === id && s.isRecording;
+  },
 
   pauseSession: () => set({ isPaused: true }),
 

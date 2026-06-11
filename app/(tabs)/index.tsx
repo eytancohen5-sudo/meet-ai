@@ -7,14 +7,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { SessionCard } from '../../components/SessionCard';
-import { getSessions, deleteSession } from '../../lib/database';
+import { NoticeBanner } from '../../components/NoticeBanner';
+import { getSessions, deleteSession, markInterruptedSessions } from '../../lib/database';
+import { useActiveSession } from '../../stores/session';
 import { Session } from '../../types';
 
 export default function SessionsScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  // Re-render when liveness changes; null whenever nothing is genuinely live.
+  const liveSessionId = useActiveSession(s => (s.isRecording ? s.sessionId : null));
 
   const load = useCallback(async () => {
+    // ADR-008 launch auto-close (challenger amendment 1): reclassify dead
+    // 'recording'/'paused' rows to 'interrupted' BEFORE the list renders, so no
+    // UI can ever treat a corpse as live. The live store id is read first —
+    // a genuinely live backgrounded recording is never swept.
+    await markInterruptedSessions(useActiveSession.getState().sessionId);
     const data = await getSessions();
     setSessions(data);
   }, []);
@@ -54,8 +63,16 @@ export default function SessionsScreen() {
     );
   };
 
-  const activeSession = sessions.find(s => s.status === 'recording' || s.status === 'paused');
-  const pastSessions = sessions.filter(s => s.status !== 'recording' && s.status !== 'paused');
+  // Red banner ONLY for a store-confirmed live recording (ADR-008 §4). After the
+  // auto-close sweep, any remaining 'recording'/'paused' row IS the live one —
+  // but the in-memory store stays the source of truth, never the persisted status.
+  const liveSession = sessions.find(
+    s => (s.status === 'recording' || s.status === 'paused') && s.id === liveSessionId
+  );
+  // Amber recovery banner for the most recent interrupted session; older ones
+  // still render in the list as amber "Interrupted" cards (getSessions is newest-first).
+  const interruptedSession = sessions.find(s => s.status === 'interrupted');
+  const pastSessions = sessions.filter(s => s.id !== liveSession?.id);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-bg">
@@ -71,18 +88,36 @@ export default function SessionsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B5BDB" />}
           showsVerticalScrollIndicator={false}
         >
-          {/* Active session banner */}
-          {activeSession && (
+          {/* Live recording banner — red, store-confirmed live only (ADR-008 §4) */}
+          {liveSession && (
             <TouchableOpacity
-              className="bg-red-500 rounded-2xl p-4 mb-4 flex-row items-center"
-              onPress={() => router.push(`/session/${activeSession.id}`)}
+              className="bg-recording rounded-2xl p-4 mb-4 flex-row items-center"
+              onPress={() => router.push(`/session/${liveSession.id}`)}
             >
               <View className="w-2.5 h-2.5 bg-white rounded-full mr-3 opacity-90" />
               <View className="flex-1">
-                <Text className="text-white font-semibold text-sm">Still going</Text>
-                <Text className="text-red-100 text-xs mt-0.5" numberOfLines={1}>{activeSession.title}</Text>
+                <Text className="text-white font-semibold text-sm">Recording — tap to return</Text>
+                <Text className="text-red-100 text-xs mt-0.5" numberOfLines={1}>{liveSession.title}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
+            </TouchableOpacity>
+          )}
+
+          {/* Interrupted recovery banner — amber reassurance, opens the read-only
+              recovery layout. Replaces the old red "Still going" footgun that
+              re-recorded dead sessions over their own audio (ADR-008). */}
+          {interruptedSession && (
+            <TouchableOpacity
+              className="mb-4"
+              activeOpacity={0.8}
+              onPress={() => router.push(`/session/${interruptedSession.id}`)}
+            >
+              <NoticeBanner
+                variant="warning"
+                message={`Recording interrupted — ${interruptedSession.title} · it's saved`}
+                actionLabel="Open"
+                onAction={() => router.push(`/session/${interruptedSession.id}`)}
+              />
             </TouchableOpacity>
           )}
 
@@ -99,13 +134,19 @@ export default function SessionsScreen() {
               {pastSessions.length > 0 && (
                 <>
                   <Text className="text-text-primary font-semibold text-sm mb-3 uppercase tracking-wide">
-                    Recent Sessions
+                    Recent
                   </Text>
                   {pastSessions.map(session => (
                     <SessionCard
                       key={session.id}
                       session={session}
-                      onPress={() => router.push(`/review/${session.id}`)}
+                      // Interrupted sessions open the read-only recovery layout —
+                      // never Review (its guards land in T8) and never live capture.
+                      onPress={() => router.push(
+                        session.status === 'interrupted'
+                          ? `/session/${session.id}`
+                          : `/review/${session.id}`
+                      )}
                       onLongPress={() => handleLongPress(session)}
                     />
                   ))}

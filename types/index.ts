@@ -1,4 +1,7 @@
-export type SessionStatus = 'recording' | 'processing' | 'complete' | 'paused';
+// 'interrupted' (ADR-008): a 'recording'/'paused' session whose process died —
+// reclassified by the launch auto-close (markInterruptedSessions). Plain TEXT
+// status value, no schema migration. Every status switch must handle it.
+export type SessionStatus = 'recording' | 'processing' | 'complete' | 'paused' | 'interrupted';
 
 export type UserRole = 'owner' | 'manager' | 'member';
 
@@ -115,13 +118,15 @@ export interface MediaItem {
   created_at: number;
 }
 
+// Prompt contract v2 (ADR-007): next_steps removed entirely. Each task carries
+// a resolved due_date (epoch ms at LOCAL midnight) via Task.due_date; when the
+// model's date is invalid/null the spoken phrase is appended to notes instead.
 export interface OrganizedSession {
   summary: string;
   tasks: Omit<Task, 'id' | 'session_id' | 'created_at' | 'status'>[];
   ideas: Omit<Idea, 'id' | 'session_id' | 'created_at'>[];
   issues: Omit<Issue, 'id' | 'session_id' | 'created_at' | 'status'>[];
   decisions: Omit<Decision, 'id' | 'session_id' | 'created_at'>[];
-  next_steps: string[];
 }
 
 export const SPEAKER_COLORS = [

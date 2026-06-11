@@ -15,6 +15,9 @@ const STATUS_CONFIG = {
   processing: { label: 'Processing', color: '#f59e0b', icon: 'hourglass-outline' as const },
   complete: { label: 'Complete', color: '#22c55e', icon: 'checkmark-circle' as const },
   paused: { label: 'Paused', color: '#6b7280', icon: 'pause-circle' as const },
+  // ADR-008: launch auto-close reclassifies dead 'recording'/'paused' sessions.
+  // Amber (matches the Home recovery banner), never the red live styling.
+  interrupted: { label: 'Interrupted', color: '#D97706', icon: 'alert-circle' as const },
 };
 
 export function SessionCard({ session, onPress, onLongPress }: Props) {
