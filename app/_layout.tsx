@@ -60,11 +60,17 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
+        {/* Pre-flight half-height sheet (Phase 3 screen 5). Larger detent lets
+            iOS expand the sheet when the keyboard appears for inline inputs. */}
         <Stack.Screen
           name="session/new"
           options={{
-            presentation: 'modal',
+            presentation: 'formSheet',
             headerShown: false,
+            sheetAllowedDetents: [0.5, 0.95],
+            sheetInitialDetentIndex: 0,
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 24,
           }}
         />
         <Stack.Screen

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActionSheetIOS, ActivityIndicator, Alert, Modal, FlatList, Platform,
+  ActionSheetIOS, ActivityIndicator, Alert, Modal, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -464,18 +464,6 @@ export default function ActiveSessionScreen() {
       ]
     );
   };
-
-  if (Platform.OS === 'web') {
-    return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center p-8">
-        <Ionicons name="phone-portrait-outline" size={48} color="#E5E7EB" />
-        <Text className="text-text-primary font-semibold text-lg mt-4">Mobile app required</Text>
-        <Text className="text-text-secondary text-sm mt-2 text-center">
-          Recording is only available in the Meet AI mobile app.
-        </Text>
-      </SafeAreaView>
-    );
-  }
 
   // ── Recovery layout — static, read-only; no capture path exists here ─────────
   if (mode === 'recovery') {

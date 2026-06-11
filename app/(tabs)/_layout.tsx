@@ -38,10 +38,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="rooms"
+        name="team"
         options={{
-          title: 'Spaces',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+          title: 'Team',
+          tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen

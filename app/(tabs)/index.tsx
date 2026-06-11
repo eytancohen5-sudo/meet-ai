@@ -1,16 +1,29 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Alert, RefreshControl,
+  Alert, RefreshControl, TextInput, ActivityIndicator, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
+import Anthropic from '@anthropic-ai/sdk';
 import { SessionCard } from '../../components/SessionCard';
 import { NoticeBanner } from '../../components/NoticeBanner';
-import { getSessions, deleteSession, markInterruptedSessions } from '../../lib/database';
+import { SetupCard, SetupStep } from '../../components/SetupCard';
+import {
+  getSessions, deleteSession, markInterruptedSessions,
+  getStaff, getSetting, setSetting,
+} from '../../lib/database';
 import { useActiveSession } from '../../stores/session';
+import { useSettings } from '../../stores/settings';
 import { Session } from '../../types';
+
+type KeyTestState = 'idle' | 'testing' | 'rejected' | 'unreachable';
+
+// Settings-table flag (key-value row, no schema change). Once set, the
+// first-run SetupCard never renders again — "dismisses for good" (Screen 9)
+// survives even if every session is later deleted.
+const SETUP_COMPLETE_KEY = 'setup_complete';
 
 export default function SessionsScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -18,14 +31,31 @@ export default function SessionsScreen() {
   // Re-render when liveness changes; null whenever nothing is genuinely live.
   const liveSessionId = useActiveSession(s => (s.isRecording ? s.sessionId : null));
 
+  // First-run SetupCard state (Screen 9 / R1). setupComplete starts true so
+  // nothing flashes before the persisted flag has been read.
+  const [staffCount, setStaffCount] = useState(0);
+  const [setupComplete, setSetupComplete] = useState(true);
+  const [keyCaptureOpen, setKeyCaptureOpen] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+  const [keyTest, setKeyTest] = useState<KeyTestState>('idle');
+  const anthropicApiKey = useSettings(s => s.anthropicApiKey);
+  const settingsLoaded = useSettings(s => s.isLoaded);
+  const setApiKey = useSettings(s => s.setApiKey);
+
   const load = useCallback(async () => {
     // ADR-008 launch auto-close (challenger amendment 1): reclassify dead
     // 'recording'/'paused' rows to 'interrupted' BEFORE the list renders, so no
     // UI can ever treat a corpse as live. The live store id is read first —
     // a genuinely live backgrounded recording is never swept.
     await markInterruptedSessions(useActiveSession.getState().sessionId);
-    const data = await getSessions();
+    const [data, staff, setupFlag] = await Promise.all([
+      getSessions(),
+      getStaff(),
+      getSetting(SETUP_COMPLETE_KEY),
+    ]);
     setSessions(data);
+    setStaffCount(staff.length);
+    setSetupComplete(setupFlag === '1');
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -63,6 +93,93 @@ export default function SessionsScreen() {
     );
   };
 
+  const hasSession = sessions.length > 0;
+  const hasKey = settingsLoaded && anthropicApiKey.trim().length > 0;
+
+  // Gone for good: once a session exists AND a key is saved, persist the
+  // dismissal so the card never comes back (Screen 9). The flag value is a
+  // plain '1' — no key material, no PII.
+  useEffect(() => {
+    if (!setupComplete && hasSession && hasKey) {
+      setSetupComplete(true);
+      setSetting(SETUP_COMPLETE_KEY, '1').catch(() => {
+        // Non-fatal: the condition re-evaluates on next load and retries.
+      });
+    }
+  }, [setupComplete, hasSession, hasKey]);
+
+  // Inline key capture (Screen 9). Same contract as the Settings "Test key"
+  // button (challenger amendment 12): one minimal API call, and the key is
+  // NEVER logged — no console output of any kind on this path. The key is
+  // persisted only when the test passes; the green tick on the "Connect
+  // Claude" row is the success feedback. Failures save nothing and report
+  // inline. Settings (and Review's missing-key card, T8) remain the save
+  // paths that don't require a successful test.
+  const testAndSaveKey = async () => {
+    if (!settingsLoaded || keyTest === 'testing') return;
+    const trimmed = keyInput.trim();
+    if (!trimmed) return;
+    setKeyTest('testing');
+    try {
+      const anthropic = new Anthropic({ apiKey: trimmed });
+      await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'ping' }],
+      });
+      await setApiKey(trimmed);
+      setKeyInput('');
+      setKeyTest('idle');
+    } catch (err) {
+      if (err instanceof Anthropic.APIError && (err.status === 401 || err.status === 403)) {
+        setKeyTest('rejected');
+      } else {
+        setKeyTest('unreachable');
+      }
+    }
+  };
+
+  // Visibility (Screen 9): full three-row card until the first recording
+  // exists; then a one-row reminder until a key is saved; then gone for good
+  // (handled by the effect above). settingsLoaded gates rendering so the
+  // "Connect Claude" tick never flickers while the store hydrates.
+  const showSetup = settingsLoaded && !setupComplete;
+  const showFullSetup = showSetup && !hasSession;
+  const showReminder = showSetup && hasSession && !hasKey;
+
+  const setupSteps: SetupStep[] = [
+    {
+      done: hasSession,
+      label: 'Record your first meeting',
+      sublabel: 'Tap the red button below.',
+      icon: 'mic-outline',
+      onPress: () => router.push('/session/new'),
+    },
+    {
+      done: staffCount > 0,
+      label: 'Add your team',
+      sublabel: '(optional — tasks can stay yours)',
+      icon: 'person-add-outline',
+      onPress: () => router.navigate('/(tabs)/team'),
+    },
+    {
+      done: hasKey,
+      label: 'Connect Claude',
+      sublabel: "Recording works without it. Organizing doesn't.",
+      icon: 'sparkles-outline',
+      onPress: () => { if (!hasKey) setKeyCaptureOpen(open => !open); },
+    },
+  ];
+
+  const reminderStep: SetupStep[] = [
+    {
+      done: false,
+      label: '1 step left: connect Claude',
+      icon: 'sparkles-outline',
+      onPress: () => setKeyCaptureOpen(open => !open),
+    },
+  ];
+
   // Red banner ONLY for a store-confirmed live recording (ADR-008 §4). After the
   // auto-close sweep, any remaining 'recording'/'paused' row IS the live one —
   // but the in-memory store stays the source of truth, never the persisted status.
@@ -87,7 +204,75 @@ export default function SessionsScreen() {
           contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 16, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3B5BDB" />}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
+          {/* First-run SetupCard (Screen 9 / R1) — above the list. Full
+              checklist before the first recording; one-row reminder after it
+              until a key is saved; never rendered again once both exist. */}
+          {(showFullSetup || showReminder) && (
+            <View className="mb-4">
+              <SetupCard steps={showFullSetup ? setupSteps : reminderStep}>
+                {keyCaptureOpen && !hasKey && (
+                  <View className="border-t border-border mt-1 pt-3">
+                    <Text className="text-text-secondary text-xs mb-2">
+                      Paste your Anthropic API key. Get one at{' '}
+                      <Text
+                        className="text-brand-600"
+                        onPress={() => Linking.openURL('https://console.anthropic.com')}
+                      >
+                        console.anthropic.com
+                      </Text>
+                    </Text>
+                    <TextInput
+                      className="border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary bg-bg"
+                      value={keyInput}
+                      onChangeText={(text) => {
+                        setKeyInput(text);
+                        if (keyTest !== 'idle') setKeyTest('idle');
+                      }}
+                      placeholder="sk-ant-..."
+                      secureTextEntry
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      editable={settingsLoaded}
+                    />
+                    <View className="flex-row items-center mt-2">
+                      <TouchableOpacity
+                        className={`rounded-xl px-4 py-2 ${
+                          !settingsLoaded || !keyInput.trim() || keyTest === 'testing'
+                            ? 'bg-gray-300'
+                            : 'bg-brand-600'
+                        }`}
+                        onPress={testAndSaveKey}
+                        disabled={!settingsLoaded || !keyInput.trim() || keyTest === 'testing'}
+                      >
+                        <Text className="text-white text-xs font-semibold">Test</Text>
+                      </TouchableOpacity>
+                      <View className="flex-1 ml-3">
+                        {keyTest === 'testing' && (
+                          <View className="flex-row items-center gap-2">
+                            <ActivityIndicator size="small" color="#3B5BDB" />
+                            <Text className="text-text-secondary text-xs">Checking key…</Text>
+                          </View>
+                        )}
+                        {keyTest === 'rejected' && (
+                          <Text className="text-red-600 text-xs font-medium">
+                            Key rejected — check console.anthropic.com
+                          </Text>
+                        )}
+                        {keyTest === 'unreachable' && (
+                          <Text className="text-red-600 text-xs font-medium">
+                            Couldn't reach Anthropic — check your connection and try again.
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </SetupCard>
+            </View>
+          )}
+
           {/* Live recording banner — red, store-confirmed live only (ADR-008 §4) */}
           {liveSession && (
             <TouchableOpacity
@@ -121,7 +306,8 @@ export default function SessionsScreen() {
             </TouchableOpacity>
           )}
 
-          {sessions.length === 0 ? (
+          {/* First-run, the SetupCard takes the empty state's place (Screen 1). */}
+          {sessions.length === 0 && !showFullSetup ? (
             <View className="items-center py-16">
               <Ionicons name="mic-outline" size={56} color="#E5E7EB" />
               <Text className="text-text-primary font-semibold text-lg mt-4">Nothing here yet.</Text>
@@ -156,19 +342,21 @@ export default function SessionsScreen() {
           )}
         </ScrollView>
 
-        {/* FAB */}
+        {/* FAB — bg-recording + mic per the Home design (Screen 1): recording
+            is the identity action, and the SetupCard's first step points at
+            "the red button below". */}
         <TouchableOpacity
-          className="absolute bottom-8 right-5 w-16 h-16 bg-brand-600 rounded-full items-center justify-center shadow-lg"
+          className="absolute bottom-8 right-5 w-16 h-16 bg-recording rounded-full items-center justify-center shadow-lg"
           onPress={() => router.push('/session/new')}
           style={{
-            shadowColor: '#3B5BDB',
+            shadowColor: '#E53E3E',
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.4,
             shadowRadius: 8,
             elevation: 8,
           }}
         >
-          <Ionicons name="add" size={32} color="white" />
+          <Ionicons name="mic" size={30} color="white" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

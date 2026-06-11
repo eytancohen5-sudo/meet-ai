@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, Share, Alert, Animated, Image,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  ActivityIndicator, Share, Alert, ActionSheetIOS, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,12 +10,13 @@ import { useAudioPlayer } from 'expo-audio';
 import {
   getSession, getTranscriptLines, getTasks, getIdeas, getIssues,
   getDecisions, getMediaItems, addTask, addIdea, addIssue, addDecision,
-  updateTaskStatus, updateSession,
+  updateTaskStatus, updateSession, deleteSession,
 } from '../../lib/database';
 import { organizeSession } from '../../lib/organization';
 import { getContexts, getStaff } from '../../lib/database';
 import { TaskCard } from '../../components/TaskCard';
 import { TranscriptLineView } from '../../components/TranscriptLine';
+import { NoticeBanner } from '../../components/NoticeBanner';
 import { Session, TranscriptLine, Task, Idea, Issue, Decision, MediaItem } from '../../types';
 import { useSettings } from '../../stores/settings';
 import { nanoid } from '../_utils';
@@ -24,9 +25,14 @@ type Tab = 'summary' | 'tasks' | 'transcript' | 'media';
 
 const SEVERITY_COLOR = { low: '#22c55e', medium: '#f59e0b', high: '#ef4444' };
 
+// Share-digest due-date suffix, e.g. " (by Jun 15)". No date library —
+// due_date is epoch ms at local midnight (binding due-date contract).
+const formatShareDue = (due?: number): string =>
+  due ? ` (by ${new Date(due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : '';
+
 export default function ReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { anthropicApiKey, isLoaded: settingsLoaded } = useSettings();
+  const { anthropicApiKey, isLoaded: settingsLoaded, setApiKey } = useSettings();
 
   const [session, setSession] = useState<Session | null>(null);
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
@@ -40,6 +46,10 @@ export default function ReviewScreen() {
   const [organizeError, setOrganizeError] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [loadError, setLoadError] = useState('');
+  // Inline key capture (missing-key card) — the value lives only in this field
+  // and stores/settings.ts; it is never logged and never rendered back as text.
+  const [keyDraft, setKeyDraft] = useState('');
+  const [savingKey, setSavingKey] = useState(false);
   // Auto-organize fires at most once per mount; manual taps bypass this guard.
   const autoOrganizeAttempted = useRef(false);
 
@@ -99,7 +109,9 @@ export default function ReviewScreen() {
     }
   };
 
-  const triggerOrganization = async (sess: Session, lines: TranscriptLine[]) => {
+  // apiKeyOverride: the "Save & organize" path passes the just-saved key by value —
+  // the hook closure still holds the pre-save (empty) key on the same tick.
+  const triggerOrganization = async (sess: Session, lines: TranscriptLine[], apiKeyOverride?: string) => {
     if (organizing) return;
     if (lines.length === 0) return;
     // Warn if transcript is very long (>500 lines may hit token limits)
@@ -110,7 +122,8 @@ export default function ReviewScreen() {
     setOrganizeError(null);
     try {
       const [locs, staff] = await Promise.all([getContexts(), getStaff()]);
-      const result = await organizeSession(lines, staff, locs, sess.title, anthropicApiKey || undefined);
+      const apiKey = apiKeyOverride ?? anthropicApiKey;
+      const result = await organizeSession(lines, staff, locs, sess.title, apiKey || undefined);
 
       // Save organized data
       const now = Date.now();
@@ -124,6 +137,10 @@ export default function ReviewScreen() {
             location_id: t.location_id,
             status: 'open',
             priority: t.priority ?? 'medium',
+            // The resolved due date (ADR-007 contract v2) — epoch ms at local
+            // midnight, already validated in lib/organization.ts. This was the
+            // verified missing pipe: extracted, then dropped at this callsite.
+            due_date: t.due_date,
             notes: t.notes,
             created_at: now,
           })
@@ -147,21 +164,13 @@ export default function ReviewScreen() {
       const lower = message.toLowerCase();
       const isApiKeyError = lower.includes('api key') || lower.includes('authentication') || lower.includes('401');
       // Do NOT force-complete here — the session stays in its current status so the
-      // "Organize with AI" retry affordance remains available.
-      if (isApiKeyError) {
-        setOrganizeError('Your Anthropic API key is missing or was rejected. Add or fix it in Settings, then retry.');
-        Alert.alert(
-          'API Key Required',
-          'Add your Anthropic API key in Settings to organize sessions.',
-          [
-            { text: 'Open Settings', onPress: () => router.push('/(tabs)/settings') },
-            { text: 'Not Now', style: 'cancel' },
-          ]
-        );
-      } else {
-        setOrganizeError(message);
-        Alert.alert('Could Not Organize', 'Something went wrong. Your transcript is safe — tap "Organize with AI" to retry.', [{ text: 'OK' }]);
-      }
+      // Retry affordance remains available (Phase 2 S4 recoverability semantics).
+      // No Alert: the persistent NoticeBanner atop Summary is the error surface.
+      setOrganizeError(
+        isApiKeyError
+          ? "Couldn't organize — your API key was rejected. Fix it in Settings, then retry."
+          : `Couldn't organize — ${message}. Your transcript is safe.`
+      );
     } finally {
       setOrganizing(false);
     }
@@ -169,22 +178,29 @@ export default function ReviewScreen() {
 
   const handleOrganizePress = () => {
     if (!session) return;
-    if (transcript.length === 0) {
-      Alert.alert('Nothing to Organize', 'This session has no transcript lines, so there is nothing for the AI to organize.', [{ text: 'OK' }]);
-      return;
-    }
-    if (settingsLoaded && !anthropicApiKey) {
-      Alert.alert(
-        'API Key Required',
-        'Add your Anthropic API key in Settings to organize sessions.',
-        [
-          { text: 'Open Settings', onPress: () => router.push('/(tabs)/settings') },
-          { text: 'Not Now', style: 'cancel' },
-        ]
-      );
-      return;
-    }
+    // Both guards are belt-and-braces: the organize button only renders with a
+    // transcript present, and the missing-key card replaces it when no key is set.
+    if (transcript.length === 0) return;
+    if (settingsLoaded && !anthropicApiKey) return;
     triggerOrganization(session, transcript);
+  };
+
+  // Missing-key card: save the pasted key via stores/settings.ts (SQLite-backed,
+  // never logged), then organize immediately — no Settings detour.
+  const handleSaveKeyAndOrganize = async () => {
+    const trimmed = keyDraft.trim();
+    if (!trimmed || !session || savingKey) return;
+    setSavingKey(true);
+    try {
+      await setApiKey(trimmed);
+      setKeyDraft('');
+      triggerOrganization(session, transcript, trimmed);
+    } catch (err: unknown) {
+      console.error('Failed to save API key:', err);
+      setOrganizeError("Couldn't save the key on this phone. Try again.");
+    } finally {
+      setSavingKey(false);
+    }
   };
 
   const handleTaskToggle = async (taskId: string, status: 'open' | 'done') => {
@@ -193,25 +209,106 @@ export default function ReviewScreen() {
     setTasks(updated);
   };
 
-  const handleShare = async () => {
-    if (!session) return;
-    const lines = [
-      `# ${session.title}`,
-      `${new Date(session.started_at).toLocaleString()}`,
-      session.context_name ? `Context: ${session.context_name}` : '',
-      '',
-      session.summary ? `## Summary\n${session.summary}` : '',
-      '',
-      tasks.length > 0 ? `## Tasks (${tasks.length})\n${tasks.map(t => `- [ ] ${t.title}${t.assigned_to_name ? ` → ${t.assigned_to_name}` : ''}`).join('\n')}` : '',
-      '',
-      ideas.length > 0 ? `## Ideas\n${ideas.map(i => `- ${i.text}`).join('\n')}` : '',
-      '',
-      issues.length > 0 ? `## Issues\n${issues.map(i => `- [${i.severity}] ${i.title}`).join('\n')}` : '',
-      '',
-      decisions.length > 0 ? `## Decisions\n${decisions.map(d => `- ${d.text}`).join('\n')}` : '',
-    ].filter(Boolean).join('\n');
+  const buildFullDigest = (sess: Session): string => [
+    `# ${sess.title}`,
+    `${new Date(sess.started_at).toLocaleString()}`,
+    sess.context_name ? `Place: ${sess.context_name}` : '',
+    '',
+    sess.summary ? `## Summary\n${sess.summary}` : '',
+    '',
+    tasks.length > 0 ? `## Tasks (${tasks.length})\n${tasks.map(t => `- [ ] ${t.title}${t.assigned_to_name ? ` → ${t.assigned_to_name}` : ''}${formatShareDue(t.due_date)}`).join('\n')}` : '',
+    '',
+    ideas.length > 0 ? `## Ideas\n${ideas.map(i => `- ${i.text}`).join('\n')}` : '',
+    '',
+    issues.length > 0 ? `## Issues\n${issues.map(i => `- [${i.severity}] ${i.title}`).join('\n')}` : '',
+    '',
+    decisions.length > 0 ? `## Decisions\n${decisions.map(d => `- ${d.text}`).join('\n')}` : '',
+  ].filter(Boolean).join('\n');
 
-    await Share.share({ message: lines, title: session.title });
+  // Single-owner handoff: one person's open tasks as plain text (WhatsApp/SMS,
+  // no accounts) — title, due date, place, notes.
+  const buildPersonDigest = (sess: Session, name: string): string => {
+    const theirs = tasks.filter(t => t.status === 'open' && t.assigned_to_name === name);
+    const lines = theirs.map(t => {
+      let line = `- [ ] ${t.title}${formatShareDue(t.due_date)}`;
+      if (t.location_name) line += ` @ ${t.location_name}`;
+      if (t.notes) line += `\n  ${t.notes}`;
+      return line;
+    });
+    return [
+      `${name} — ${theirs.length} task${theirs.length !== 1 ? 's' : ''} from "${sess.title}":`,
+      ...lines,
+    ].join('\n');
+  };
+
+  const shareText = async (message: string, title: string) => {
+    await Share.share({ message, title });
+  };
+
+  // Pre-step action sheet "Everything" / "Just [person]'s tasks" — only when at
+  // least one open task has an assignee; otherwise share everything directly.
+  const handleShare = () => {
+    if (!session) return;
+    const sess = session;
+    const assignees = Array.from(new Set(
+      tasks
+        .filter(t => t.status === 'open')
+        .map(t => t.assigned_to_name)
+        .filter((name): name is string => !!name)
+    ));
+    if (assignees.length === 0) {
+      shareText(buildFullDigest(sess), sess.title);
+      return;
+    }
+    const options = ['Everything', ...assignees.map(n => `Just ${n}'s tasks`), 'Cancel'];
+    ActionSheetIOS.showActionSheetWithOptions(
+      { options, cancelButtonIndex: options.length - 1 },
+      (buttonIndex) => {
+        if (buttonIndex === 0) {
+          shareText(buildFullDigest(sess), sess.title);
+        } else if (buttonIndex > 0 && buttonIndex < options.length - 1) {
+          shareText(buildPersonDigest(sess, assignees[buttonIndex - 1]), sess.title);
+        }
+      }
+    );
+  };
+
+  // "…" overflow — Delete session only this phase (Rename is Phase 4).
+  const handleOverflow = () => {
+    if (!session) return;
+    const sess = session;
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ['Delete session', 'Cancel'],
+        destructiveButtonIndex: 0,
+        cancelButtonIndex: 1,
+      },
+      (buttonIndex) => {
+        if (buttonIndex !== 0) return;
+        // Single confirm, item named (design principle 5) — same copy as Home.
+        Alert.alert(
+          `Delete "${sess.title}"?`,
+          'Transcript, tasks and audio go with it.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await deleteSession(id);
+                  if (router.canGoBack()) router.back();
+                  else router.replace('/(tabs)');
+                } catch (err: unknown) {
+                  console.error('Failed to delete session:', err);
+                  Alert.alert('Could not delete', 'Something went wrong. Please try again.');
+                }
+              },
+            },
+          ]
+        );
+      }
+    );
   };
 
   const handleTranscriptLinePress = async (line: TranscriptLine) => {
@@ -293,6 +390,9 @@ export default function ReviewScreen() {
           <TouchableOpacity onPress={handleShare} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="share-outline" size={22} color="#1A1D23" />
           </TouchableOpacity>
+          <TouchableOpacity onPress={handleOverflow} className="ml-4" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="ellipsis-horizontal" size={22} color="#1A1D23" />
+          </TouchableOpacity>
         </View>
         <View className="flex-row gap-3 flex-wrap">
           {session.context_name && (
@@ -315,17 +415,6 @@ export default function ReviewScreen() {
         </View>
       </View>
 
-      {/* Organizing overlay */}
-      {organizing && (
-        <View className="absolute inset-0 bg-black/50 z-50 items-center justify-center">
-          <View className="bg-white rounded-2xl p-6 items-center mx-8">
-            <ActivityIndicator color="#3B5BDB" size="large" />
-            <Text className="text-text-primary font-semibold text-base mt-4">Reading the room...</Text>
-            <Text className="text-text-secondary text-sm mt-1 text-center">Sorting out what matters.</Text>
-          </View>
-        </View>
-      )}
-
       <View className="flex-1 bg-bg">
         {/* Tab Bar */}
         <ScrollView
@@ -343,9 +432,9 @@ export default function ReviewScreen() {
             <TouchableOpacity
               key={tab.id}
               className={`flex-row items-center gap-1.5 px-4 py-2 rounded-full border ${activeTab === tab.id ? 'bg-brand-600 border-brand-600' : 'bg-white border-border'}`}
-              onPress={() => setActiveTab(tab.id as Tab)}
+              onPress={() => setActiveTab(tab.id)}
             >
-              <Ionicons name={tab.icon as any} size={14} color={activeTab === tab.id ? 'white' : '#6B7280'} />
+              <Ionicons name={tab.icon} size={14} color={activeTab === tab.id ? 'white' : '#6B7280'} />
               <Text className={`text-sm font-medium ${activeTab === tab.id ? 'text-white' : 'text-text-secondary'}`}>
                 {tab.label}
               </Text>
@@ -360,38 +449,79 @@ export default function ReviewScreen() {
         >
           {activeTab === 'summary' && (
             <View>
-              {/* Missing API key — loud, with a path to Settings */}
-              {settingsLoaded && !anthropicApiKey && !session.summary && transcript.length > 0 && (
-                <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
-                  <View className="flex-row items-center gap-2 mb-1">
-                    <Ionicons name="key-outline" size={16} color="#dc2626" />
-                    <Text className="text-red-700 font-semibold text-sm">API key required</Text>
-                  </View>
-                  <Text className="text-red-600 text-xs leading-relaxed">
-                    Add your Anthropic API key in Settings to organize this session with AI.
-                  </Text>
-                  <TouchableOpacity
-                    className="bg-red-600 rounded-xl px-4 py-2 mt-3 self-start"
-                    onPress={() => router.push('/(tabs)/settings')}
-                  >
-                    <Text className="text-white text-sm font-semibold">Open Settings</Text>
-                  </TouchableOpacity>
+              {/* Interrupted recording — recovery happens on the Recording screen
+                  (ADR-008); organize is never offered here for this status. */}
+              {session.status === 'interrupted' && (
+                <View className="mb-4">
+                  <NoticeBanner
+                    variant="warning"
+                    message="This recording was interrupted. Recover it to keep what was captured."
+                    actionLabel="Recover"
+                    onAction={() => router.replace(`/session/${id}`)}
+                  />
                 </View>
               )}
 
-              {/* Last organize attempt failed — visible, recoverable */}
-              {organizeError && !organizing ? (
-                <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
-                  <View className="flex-row items-center gap-2 mb-1">
-                    <Ionicons name="warning-outline" size={16} color="#dc2626" />
-                    <Text className="text-red-700 font-semibold text-sm">Organization failed</Text>
+              {/* Non-blocking organize progress — Transcript/Media stay browsable */}
+              {organizing && (
+                <View className="bg-white rounded-2xl border border-border p-4 mb-4 flex-row items-center gap-3">
+                  <ActivityIndicator color="#3B5BDB" />
+                  <View className="flex-1">
+                    <Text className="text-text-primary font-semibold text-sm">Reading the room...</Text>
+                    <Text className="text-text-secondary text-xs mt-0.5">
+                      Sorting out what matters — feel free to browse the transcript meanwhile.
+                    </Text>
                   </View>
-                  <Text className="text-red-600 text-xs leading-relaxed">{organizeError}</Text>
-                  <Text className="text-text-secondary text-xs mt-1">
-                    Your transcript is safe — tap "Organize with AI" below to retry.
-                  </Text>
+                </View>
+              )}
+
+              {/* Last organize attempt failed — persistent banner, one verb (Retry) */}
+              {organizeError && !organizing ? (
+                <View className="mb-4">
+                  <NoticeBanner
+                    variant="error"
+                    message={organizeError}
+                    actionLabel="Retry"
+                    onAction={() => triggerOrganization(session, transcript)}
+                  />
                 </View>
               ) : null}
+
+              {/* Missing key — inline capture at the moment of highest motivation.
+                  No Settings detour; key saved via stores/settings.ts, never logged. */}
+              {settingsLoaded && !anthropicApiKey && !session.summary && transcript.length > 0 &&
+                session.status !== 'interrupted' && !organizing && (
+                <View className="bg-brand-50 border border-brand-200 rounded-2xl p-4 mb-4">
+                  <View className="flex-row items-center gap-2 mb-1">
+                    <Ionicons name="sparkles-outline" size={16} color="#3B5BDB" />
+                    <Text className="text-brand-800 font-semibold text-sm flex-1">
+                      Add your Claude key to organize this session
+                    </Text>
+                  </View>
+                  <Text className="text-text-secondary text-xs leading-relaxed">
+                    Recording works without it. Organizing doesn't. It's stored only on this phone.
+                  </Text>
+                  <TextInput
+                    className="bg-white border border-brand-200 rounded-xl px-3 py-2.5 text-sm text-text-primary mt-3"
+                    placeholder="sk-ant-..."
+                    placeholderTextColor="#9CA3AF"
+                    value={keyDraft}
+                    onChangeText={setKeyDraft}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    secureTextEntry
+                  />
+                  <TouchableOpacity
+                    className={`rounded-xl px-4 py-2.5 mt-3 self-start ${keyDraft.trim() && !savingKey ? 'bg-brand-600' : 'bg-brand-200'}`}
+                    onPress={handleSaveKeyAndOrganize}
+                    disabled={!keyDraft.trim() || savingKey}
+                  >
+                    <Text className="text-white text-sm font-semibold">
+                      {savingKey ? 'Saving...' : 'Save & organize'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Summary */}
               {session.summary ? (
@@ -406,13 +536,13 @@ export default function ReviewScreen() {
 
               {/* Quick stats */}
               <View className="flex-row gap-3 mb-4">
-                {[
+                {([
                   { label: 'Tasks', count: tasks.length, color: '#E06C1A', icon: 'checkbox-outline' },
                   { label: 'Ideas', count: ideas.length, color: '#D97706', icon: 'bulb-outline' },
                   { label: 'Issues', count: issues.length, color: '#ef4444', icon: 'warning-outline' },
-                ].map(stat => (
+                ] as const).map(stat => (
                   <View key={stat.label} className="flex-1 bg-white rounded-2xl border border-border p-3 items-center">
-                    <Ionicons name={stat.icon as any} size={20} color={stat.color} />
+                    <Ionicons name={stat.icon} size={20} color={stat.color} />
                     <Text className="text-2xl font-bold text-text-primary mt-1">{stat.count}</Text>
                     <Text className="text-text-secondary text-xs">{stat.label}</Text>
                   </View>
@@ -501,7 +631,7 @@ export default function ReviewScreen() {
                 </View>
               )}
 
-              {!session.summary && !organizing && (
+              {!session.summary && !organizing && session.status !== 'interrupted' && (
                 transcript.length === 0 ? (
                   <View className="border-2 border-dashed border-border rounded-2xl p-6 items-center">
                     <Ionicons name="mic-off-outline" size={28} color="#9CA3AF" />
@@ -510,7 +640,8 @@ export default function ReviewScreen() {
                       No transcript was captured in this session, so there is nothing for the AI to organize.
                     </Text>
                   </View>
-                ) : (
+                ) : settingsLoaded && !anthropicApiKey ? null : (
+                  // With no key saved, the inline key card above IS the organize affordance.
                   <TouchableOpacity
                     className="border-2 border-dashed border-border rounded-2xl p-6 items-center"
                     onPress={handleOrganizePress}
