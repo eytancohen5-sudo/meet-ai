@@ -5,7 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../stores/auth';
 import { getAllOpenTasks, getSessions } from '../../lib/database';
-import { supabase } from '../../lib/supabase';
+import { getSupabase } from '../../lib/supabase';
 import { TaskCard } from '../../components/TaskCard';
 import { Task, Session } from '../../types';
 
@@ -28,14 +28,14 @@ export default function MemberDashboard() {
     try {
       if (isSyncEnabled()) {
         // Fetch open tasks assigned to this user from Supabase
-        const { data: supabaseTasks } = await supabase
+        const { data: supabaseTasks } = await getSupabase()
           .from('tasks')
           .select('*')
           .eq('assigned_to', userId)
           .eq('status', 'open');
 
         // Fetch sessions this user participated in from Supabase
-        const { data: supabaseSessions } = await supabase
+        const { data: supabaseSessions } = await getSupabase()
           .from('sessions')
           .select('*')
           .contains('participant_ids', [userId])
