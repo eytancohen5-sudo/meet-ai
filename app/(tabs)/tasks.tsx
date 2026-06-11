@@ -12,7 +12,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { NoticeBanner } from '../../components/NoticeBanner';
 import { PersonChip } from '../../components/PersonChip';
 import {
-  getAllTasks, updateTaskStatus, updateTask, deleteTask, addTask,
+  getAllTasks, updateTaskStatus, updateTask, deleteTask,
   getAllOpenIssues, updateIssueStatus, getStaff,
 } from '../../lib/database';
 import { TAB_SCREEN_EDGES } from '../../lib/ui';
@@ -163,9 +163,18 @@ export default function TasksScreen() {
     for (const task of openSegmentTasks) {
       const id = task.assigned_to;
       const name = task.assigned_to_name;
-      // A dangling assigned_to (member removed from Team) groups as Unassigned —
-      // keeps Team's "their tasks stay and become Unassigned" promise.
-      if (id && name) {
+      if (id === 'me') {
+        // Owner sentinel id: organization.ts findStaffId maps "you"/"me"/"owner"
+        // to 'me', which has no staff row, so the LEFT JOIN yields no name.
+        // These are the owner's own tasks — the "You" group (initials/avatar
+        // derive from ownerName in the render fallback below).
+        ensure('me', () => ({
+          key: 'me',
+          label: 'You',
+          unassigned: false,
+          tasks: [],
+        })).tasks.push(task);
+      } else if (id && name) {
         ensure(id, () => ({
           key: id,
           label: name.trim().toLowerCase() === ownerNorm ? 'You' : name,
@@ -174,6 +183,8 @@ export default function TasksScreen() {
           tasks: [],
         })).tasks.push(task);
       } else {
+        // A dangling assigned_to (member removed from Team) groups as Unassigned —
+        // keeps Team's "their tasks stay and become Unassigned" promise.
         ensure(UNASSIGNED_KEY, () => ({
           key: UNASSIGNED_KEY,
           label: 'Unassigned',
@@ -247,8 +258,15 @@ export default function TasksScreen() {
 
   const openEdit = (task: Task) => {
     setEditingTask(task);
-    // A dangling assignee id (deleted member) is presented as Unassigned.
-    setDraftAssignee(task.assigned_to && task.assigned_to_name ? task.assigned_to : null);
+    // A dangling assignee id (deleted member) is presented as Unassigned. The
+    // owner sentinel 'me' is preserved (no chip selected — the sheet offers
+    // person chips + Unassigned per 02-screen-designs) so that Save doesn't
+    // silently move a "You" task to Unassigned.
+    setDraftAssignee(
+      task.assigned_to === 'me' || (task.assigned_to && task.assigned_to_name)
+        ? task.assigned_to
+        : null
+    );
     setDraftDue(task.due_date ?? null);
     setDraftPriority(task.priority);
   };
@@ -257,35 +275,14 @@ export default function TasksScreen() {
 
   const saveEdits = async () => {
     if (!editingTask) return;
-    const clearsAssignee = editingTask.assigned_to != null && draftAssignee === null;
-    const clearsDue = editingTask.due_date != null && draftDue === null;
     try {
-      if (clearsAssignee || clearsDue) {
-        // updateTask's Partial<Task> signature cannot express writing SQL NULL
-        // (its runtime maps null → NULL via `?? null`, but Task's optionals
-        // reject null — T1 typing gap, flagged to atlas). Until the signature
-        // is widened, clear fields by rewriting the row through addTask, which
-        // binds omitted optionals as NULL. Same id + created_at: a rewrite of
-        // the same task, not a new one.
-        await deleteTask(editingTask.id);
-        await addTask({
-          id: editingTask.id,
-          session_id: editingTask.session_id,
-          title: editingTask.title,
-          assigned_to: draftAssignee ?? undefined,
-          location_id: editingTask.location_id ?? undefined,
-          status: editingTask.status,
-          priority: draftPriority,
-          due_date: draftDue ?? undefined,
-          notes: editingTask.notes ?? undefined,
-          created_at: editingTask.created_at,
-        });
-      } else {
-        const updates: Partial<Task> = { priority: draftPriority };
-        if (draftAssignee !== null) updates.assigned_to = draftAssignee;
-        if (draftDue !== null) updates.due_date = draftDue;
-        await updateTask(editingTask.id, updates);
-      }
+      // TaskUpdate contract (R2 widening): null writes SQL NULL, so clearing
+      // assignee/due date is one atomic UPDATE — no delete+re-add.
+      await updateTask(editingTask.id, {
+        assigned_to: draftAssignee,
+        due_date: draftDue,
+        priority: draftPriority,
+      });
     } catch {
       Alert.alert("Couldn't save changes", 'Please try again.');
       return;

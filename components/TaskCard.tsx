@@ -100,10 +100,14 @@ export function TaskCard({ task, onToggle, onEdit, sessionTitle, compact = false
                 </Text>
               </View>
             )}
-            {task.assigned_to_name && (
+            {(task.assigned_to === 'me' || !!task.assigned_to_name) && (
               <View className="flex-row items-center gap-1 bg-brand-50 px-2 py-0.5 rounded-full">
                 <Ionicons name="person-outline" size={10} color="#3B5BDB" />
-                <Text className="text-xs text-brand-600">{task.assigned_to_name}</Text>
+                <Text className="text-xs text-brand-600">
+                  {/* 'me' is the owner sentinel id (organization.ts findStaffId) —
+                      no staff row, so assigned_to_name is empty. Show "You". */}
+                  {task.assigned_to === 'me' ? 'You' : task.assigned_to_name}
+                </Text>
               </View>
             )}
             {task.location_name && (
