@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Alert, SafeAreaView, Modal, FlatList, Image, Platform,
+  Alert, Modal, FlatList, Image, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -10,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { useActiveSession } from '../../stores/session';
 import {
-  addTranscriptLine, addMediaItem, updateSession, getContexts, getStaff,
+  addTranscriptLine, addMediaItem, updateSession, getContexts, getStaff, getSession,
 } from '../../lib/database';
 import { saveAudioToDocuments, formatDuration, getRecordingElapsed, markRecordingStart, markPauseStart, markResumed } from '../../lib/transcription';
 import {
@@ -194,29 +195,52 @@ export default function ActiveSessionScreen() {
   }, []);
 
   useEffect(() => {
-    // Start speech recognition
-    startListening();
+    let cancelled = false;
 
-    // Start audio recording
-    setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
-      .then(() => recorder.prepareToRecordAsync())
-      .then(() => recorder.record())
-      .then(() => {
-        markRecordingStart();
-        // Re-anchor: startListening() above snapshotted getRecordingElapsed()
-        // BEFORE markRecordingStart() reset the module-scope clock, so for any
-        // session after the first it held the PREVIOUS session's elapsed time.
-        // Recording starts now, so this recognition cycle began at 0s.
-        recognitionStartElapsed.current = 0;
-      })
-      .catch(console.error);
+    (async () => {
+      // T11-3 guard: this screen auto-starts capture on mount, so deep-linking
+      // meetai://session/<id> for a finished session would re-record it and
+      // overwrite its .m4a. Check the persisted status BEFORE touching the
+      // recorder — finished sessions belong on the review screen.
+      try {
+        const existing = await getSession(id);
+        if (cancelled) return;
+        if (existing && (existing.status === 'complete' || existing.status === 'processing')) {
+          router.replace(`/review/${id}`);
+          return;
+        }
+      } catch (err) {
+        // Status unreadable (cold-start DB hiccup): fall through and record —
+        // blocking a legitimate new session is worse than the rare re-check.
+        console.error('Failed to read session status before recording:', err);
+        if (cancelled) return;
+      }
 
-    // Elapsed timer
-    elapsedRef.current = setInterval(() => {
-      setElapsed(getRecordingElapsed());
-    }, 1000);
+      // Start speech recognition
+      startListening();
+
+      // Start audio recording
+      setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
+        .then(() => recorder.prepareToRecordAsync())
+        .then(() => recorder.record())
+        .then(() => {
+          markRecordingStart();
+          // Re-anchor: startListening() above snapshotted getRecordingElapsed()
+          // BEFORE markRecordingStart() reset the module-scope clock, so for any
+          // session after the first it held the PREVIOUS session's elapsed time.
+          // Recording starts now, so this recognition cycle began at 0s.
+          recognitionStartElapsed.current = 0;
+        })
+        .catch(console.error);
+
+      // Elapsed timer
+      elapsedRef.current = setInterval(() => {
+        setElapsed(getRecordingElapsed());
+      }, 1000);
+    })();
 
     return () => {
+      cancelled = true;
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       clearPendingRestart();
     };
