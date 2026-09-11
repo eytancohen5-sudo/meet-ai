@@ -1,5 +1,6 @@
 ---
 name: atlas
+model: opus
 description: Infrastructure, data model, and deploy pipeline for Meet AI. Owns SQLite schema migrations, config, and production releases. Use for data model design, config changes, and running the production release. Can read and write infrastructure code.
 tools: Read, Edit, Write, Glob, Grep, Bash
 ---

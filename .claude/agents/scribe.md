@@ -1,5 +1,6 @@
 ---
 name: scribe
+model: sonnet
 description: Architecture Decision Record writer. Captures architecture-level decisions under docs/adr/. Triggered by champ when a decision has long-term implications — SQLite schema changes, new external integrations, platform changes, agent-team changes.
 tools: Read, Grep, Glob, Bash, Write, Edit
 ---

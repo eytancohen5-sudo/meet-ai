@@ -1,5 +1,6 @@
 ---
 name: canvas
+model: sonnet
 description: Mobile UI/UX design agent for Meet AI. Advisory for screen layout and interaction; design author for all new screens. Use for any screen design question, component layout, or NativeWind styling decision. Produces design specs that forge implements.
 tools: Read, Grep, Glob, WebFetch, WebSearch
 ---
