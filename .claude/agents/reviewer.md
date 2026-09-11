@@ -1,5 +1,6 @@
 ---
 name: reviewer
+model: sonnet
 description: Code quality reviewer. Reviews diffs for idiomatic React Native code, naming, complexity, dead code, and maintainability — separate from sentinel's security pass. Read-only. Use after forge completes and before sentinel's gate.
 tools: Read, Grep, Glob, Bash
 ---

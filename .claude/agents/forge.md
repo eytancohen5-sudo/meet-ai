@@ -1,5 +1,6 @@
 ---
 name: forge
+model: sonnet
 description: Primary code builder for Meet AI. Implements features and fixes bugs. Receives SPEC-validated tasks after challenger approval. Hands off to reviewer then sentinel before any deploy. The only agent that writes production code.
 tools: Read, Edit, Write, Glob, Grep, Bash, WebFetch, WebSearch
 ---
