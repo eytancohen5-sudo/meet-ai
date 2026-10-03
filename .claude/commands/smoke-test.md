@@ -1,6 +1,6 @@
 # /smoke-test — Production Smoke Test Protocol
 
-Sentinel's priority-ordered test suite. Run before and after every deploy.
+Priority-ordered test suite. Run before and after every deploy.
 Run `npm test` first, then perform manual checks on the iOS simulator.
 
 ## Priority 1 — Recording session (must PASS before any deploy)
@@ -32,6 +32,6 @@ Run `npm test` first, then perform manual checks on the iOS simulator.
 SMOKE TEST RUN — [date]
 [TEST NAME] — PASS / FAIL / SKIP + reason
 
-OVERALL: SENTINEL CLEAR / SENTINEL BLOCK
+OVERALL: PASS / FAIL
 ```
-Priority 1–3 FAIL → SENTINEL BLOCK. All Priority 1–3 PASS → SENTINEL CLEAR.
+Priority 1–3 FAIL → OVERALL FAIL. All Priority 1–3 PASS → OVERALL PASS.

@@ -35,7 +35,7 @@ The primary Meet AI workflow: start a meeting session, record it, and process th
 - Export or share the session summary if needed
 
 ## Hard stops — do NOT proceed if:
-- No Anthropic API key set (sentinel has flagged this)
+- No Anthropic API key set
 - Microphone permission denied — guide Eytan to iOS Settings to grant
 - Claude API returns a parse error — do not silently discard; show the raw error to Eytan
 - Session has zero transcript lines — do not trigger organize
